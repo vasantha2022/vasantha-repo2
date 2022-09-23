@@ -15,16 +15,13 @@
 					"ifFalseActivities": [
 						{
 							"name": "Set as city not exists",
-							"description": "no its not exist",
+							"description": "",
 							"type": "SetVariable",
 							"dependsOn": [],
 							"userProperties": [],
 							"typeProperties": {
 								"variableName": "var_city",
-								"value": {
-									"value": "@pipeline().parameters.city_name",
-									"type": "Expression"
-								}
+								"value": "no its not exist"
 							}
 						}
 					],
@@ -37,10 +34,7 @@
 							"userProperties": [],
 							"typeProperties": {
 								"variableName": "var_city",
-								"value": {
-									"value": "@pipeline().parameters.city_name",
-									"type": "Expression"
-								}
+								"value": "yes its exist"
 							}
 						}
 					]
