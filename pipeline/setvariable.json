@@ -1,0 +1,93 @@
+{
+	"name": "setvariable",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set city name variable",
+				"description": "get the value of the property 'city' from the pipeline parameter address line of string type",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_state name",
+					"value": {
+						"value": "@trim(split(split(pipeline().parameters.param_addressline, ',')[2], ':')[1])",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "append city name to list of cities",
+				"description": "append the value of variable 'var-statename' to the existing array variables",
+				"type": "AppendVariable",
+				"dependsOn": [
+					{
+						"activity": "Set city name variable",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_listofcities",
+					"value": {
+						"value": "@variables('var_state name')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set variable1",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "append city name to list of cities",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_appendedcities",
+					"value": {
+						"value": "@variables('var_listofcities')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"param_addressline": {
+				"type": "string",
+				"defaultValue": "address: nehrunagar, city: guntur, state: Andhra pradesh"
+			},
+			"param_listofcities": {
+				"type": "array",
+				"defaultValue": [
+					"guntur",
+					"vijayawada",
+					"tenali"
+				]
+			}
+		},
+		"variables": {
+			"var_state name": {
+				"type": "String"
+			},
+			"var_listofcities": {
+				"type": "Array",
+				"defaultValue": [
+					"guntur",
+					"vijayawada",
+					"tenali"
+				]
+			},
+			"var_appendedcities": {
+				"type": "Array"
+			}
+		},
+		"annotations": []
+	}
+}
