@@ -1,0 +1,65 @@
+{
+	"name": "pipeline1",
+	"properties": {
+		"activities": [
+			{
+				"name": "check for the city exist or not exist",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"ifFalseActivities": [
+						{
+							"name": "Set as city not exists",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "var_city",
+								"value": {
+									"value": "@pipeline().parameters.city_name",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "set as city exist",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "var_city",
+								"value": {
+									"value": "@pipeline().parameters.city_name",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"list_of_cities": {
+				"type": "array",
+				"defaultValue": [
+					"usa",
+					"uk",
+					"tokyo"
+				]
+			},
+			"city_name": {
+				"type": "string",
+				"defaultValue": "uk"
+			}
+		},
+		"variables": {
+			"var_city": {
+				"type": "String"
+			}
+		},
+		"annotations": []
+	}
+}
