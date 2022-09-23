@@ -8,9 +8,14 @@
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
+					"expression": {
+						"value": "@contains(pipeline().parameters.list_of_cities, pipeline().parameters.city_name)",
+						"type": "Expression"
+					},
 					"ifFalseActivities": [
 						{
 							"name": "Set as city not exists",
+							"description": "no its not exist",
 							"type": "SetVariable",
 							"dependsOn": [],
 							"userProperties": [],
@@ -26,6 +31,7 @@
 					"ifTrueActivities": [
 						{
 							"name": "set as city exist",
+							"description": "yes. it exist",
 							"type": "SetVariable",
 							"dependsOn": [],
 							"userProperties": [],
