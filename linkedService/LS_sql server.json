@@ -1,0 +1,26 @@
+{
+	"name": "LS_sql server",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "LS for connecting sql server",
+		"parameters": {
+			"server": {
+				"type": "string"
+			},
+			"database": {
+				"type": "string"
+			},
+			"username": {
+				"type": "string"
+			},
+			"pwd": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"connectionString": "Integrated Security=False;Data Source=@{linkedService().server};Initial Catalog=@{linkedService().database};User ID=@{linkedService().username};Password=@{linkedService().pwd}"
+		}
+	}
+}
