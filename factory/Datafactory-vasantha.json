@@ -1,0 +1,9 @@
+{
+	"name": "Datafactory-vasantha",
+	"location": "southindia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "cea7408b-c93c-4a04-b776-89f0828dd0c8",
+		"tenantId": "c28b1fad-bd94-4661-90c5-a21e2cbbdce0"
+	}
+}
