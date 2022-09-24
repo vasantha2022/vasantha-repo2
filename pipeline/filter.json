@@ -1,0 +1,40 @@
+{
+	"name": "filter",
+	"properties": {
+		"activities": [
+			{
+				"name": "Filter city start with L",
+				"description": "filter list of cities starts with L",
+				"type": "Filter",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.param_listofcities",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@startswith(item(), 'G')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"param_listofcities": {
+				"type": "array",
+				"defaultValue": [
+					"guntur",
+					"vijayawada",
+					"tenali"
+				]
+			}
+		},
+		"variables": {
+			"var_cityname": {
+				"type": "String"
+			}
+		},
+		"annotations": []
+	}
+}
