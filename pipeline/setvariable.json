@@ -56,6 +56,29 @@
 						"type": "Expression"
 					}
 				}
+			},
+			{
+				"name": "Filter1",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "Set variable1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.param_listofcities",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@startswith(item(), 'G')",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
