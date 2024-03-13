@@ -1,0 +1,164 @@
+{
+  "name": "PL_GEN_ADA_MASTER_SEQ_EXEC",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup get excel metadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@pipeline().parameters.folder_path",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@pipeline().parameters.folder_name",
+                "type": "Expression"
+              },
+              "metadata_sheet": "meta_seq",
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "ForEach execute interface",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Lookup get excel metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup get excel metadata').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Execute Pipeline master",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "policy": {
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "PL_GEN_ADA_MASTER",
+                  "type": "PipelineReference"
+                },
+                "waitOnCompletion": true,
+                "parameters": {
+                  "data_source": {
+                    "value": "@item().data_source",
+                    "type": "Expression"
+                  },
+                  "tenant_id": {
+                    "value": "@item().tenant_id",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Append system_error ForEach datasource",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Execute Pipeline master",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Execute Pipeline master\",\"error\":\"',activity('Execute Pipeline master')?.Error?.message,'\",\"status\":\"',activity('Execute Pipeline master')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach data source",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach datasource",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "folder_path": {
+        "type": "string"
+      },
+      "folder_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/MASTER_PIPELINE"
+    },
+    "annotations": []
+  }
+}

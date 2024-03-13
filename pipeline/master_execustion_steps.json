@@ -1,0 +1,1651 @@
+{
+  "name": "PL_GEN_ADA_MASTER_EXECUTION_STEPS",
+  "properties": {
+    "activities": [
+      {
+        "name": "switch_execution_step",
+        "type": "Switch",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "on": {
+            "value": "@if(empty(variables('error_reason')),pipeline().parameters.execution_step_name,'nothing to process')",
+            "type": "Expression"
+          },
+          "cases": [
+            {
+              "value": "sftp_ingestion",
+              "activities": [
+                {
+                  "name": "sftp_ingestion_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_SFTP_INGESTION_MASTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "sftp_ingestion_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "sftp_ingestion_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('sftp_ingestion_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "compress_file_extraction",
+              "activities": [
+                {
+                  "name": "compress_file_extraction_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_EXTRACT_COMP_FILES",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "error_reason_compress",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "compress_file_extraction_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('compress_file_extraction_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "malware_scan",
+              "activities": [
+                {
+                  "name": "malware_scan_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_MALWARE_SCANNING",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "malware_scan_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "malware_scan_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('malware_scan_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "md5_check",
+              "activities": [
+                {
+                  "name": "md5_check_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_MD5_VALIDATION",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "md5_check_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "md5_check_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('md5_check_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "file_conversion_csv",
+              "activities": [
+                {
+                  "name": "file_converison_csv_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_FILE_CONVERSION_MASTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "file_converison_csv_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "file_converison_csv_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('file_converison_csv_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "ingestion_bronze",
+              "activities": [
+                {
+                  "name": "ingestion_bronze_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADB_INGESTION_BRONZE",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "ingestion_bronze_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "ingestion_bronze_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('ingestion_bronze_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "transformations",
+              "activities": [
+                {
+                  "name": "transformations_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADF_TRANSFORMATION",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenantid": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "transformations_sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "schema_name": {
+                        "value": "@pipeline().parameters.table_schema_name",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "transformations_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "transformations_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('transformations_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "dq_rules",
+              "activities": [
+                {
+                  "name": "dq_rules_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADF_DQ_RULES",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenantid": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "rules_sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "schema_name": {
+                        "value": "@pipeline().parameters.table_schema_name",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "dq_rules_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "dq_rules_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('dq_rules_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "aggregation",
+              "activities": [
+                {
+                  "name": "aggregation_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADB_AGGREGATION_JOIN",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenantid": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "aggr_sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "schema_name": {
+                        "value": "@pipeline().parameters.table_schema_name",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "aggregation_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "aggregation_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('aggregation_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "gold_layer",
+              "activities": [
+                {
+                  "name": "gold_delta_layer_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADB_GOLD_DELTA_LAYER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenantid": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "schema_mapping_sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "target_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "schema_name": {
+                        "value": "@pipeline().parameters.table_schema_name",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "gold_delta_layer_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "gold_delta_layer_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('gold_delta_layer_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "bc_api_operations",
+              "activities": [
+                {
+                  "name": "bc_api_operations_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADB_BC_API_OPERATIONS",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "sheet_name": {
+                        "value": "@pipeline().parameters.sheet_name",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "bc_api_operations_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "bc_api_operations_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('bc_api_operations_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "api_get_call",
+              "activities": [
+                {
+                  "name": "api_master_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_INGESTION_API_MASTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "entity_name": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "api_master_pipeline_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "api_master_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('api_master_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "sftp_outbound",
+              "activities": [
+                {
+                  "name": "sftp_outbound_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_SFTP_OUTBOUND_MASTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "filter_table_name": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "sftp_outbound_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "sftp_outbound_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('sftp_outbound_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "json_formatting",
+              "activities": [
+                {
+                  "name": "Json formatter",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_JSON_FILE_FORMATTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "data_source_filter": {
+                        "value": "@pipeline().parameters.filter_table_name",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "json_formatter_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Json formatter",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('Json formatter').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "centralized_logging",
+              "activities": [
+                {
+                  "name": "centralized_logging_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_ADB_CENTRALIZED_LOGGING",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "schema_name": {
+                        "value": "@pipeline().parameters.table_schema_name",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "centralized_loggine_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "centralized_logging_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('centralized_logging_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "value": "sftp_archive_files",
+              "activities": [
+                {
+                  "name": "sftp_archive_files_pipeline",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_SFTP_ARCHIVE_MASTER",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "file_pattern": {
+                        "value": "@pipeline().parameters.file_pattern",
+                        "type": "Expression"
+                      },
+                      "source_type": {
+                        "value": "@pipeline().parameters.source_type",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "tenant_id": {
+                        "value": "@pipeline().parameters.tenant_id",
+                        "type": "Expression"
+                      },
+                      "date_path": {
+                        "value": "@pipeline().parameters.date_path",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      },
+                      "adb_url": {
+                        "value": "@pipeline().parameters.adb_url",
+                        "type": "Expression"
+                      },
+                      "adb_cluster_id": {
+                        "value": "@pipeline().parameters.adb_cluster_id",
+                        "type": "Expression"
+                      },
+                      "adb_token_kv": {
+                        "value": "@pipeline().parameters.adb_token_kv",
+                        "type": "Expression"
+                      },
+                      "adb_repo_url": {
+                        "value": "@pipeline().parameters.adb_repo_url",
+                        "type": "Expression"
+                      },
+                      "log_table_name": {
+                        "value": "@pipeline().parameters.log_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "sftp_archive_files_pipeline_error",
+                  "type": "SetVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "sftp_archive_files_pipeline",
+                      "dependencyConditions": [
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "error_reason",
+                    "value": {
+                      "value": "@activity('sftp_archive_files_pipeline').Error.message",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "if condition check_error",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "switch_execution_step",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@empty(variables('error_reason'))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Fail if error",
+              "type": "Fail",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "@concat('Failed with following reason', variables('error_reason'))",
+                  "type": "Expression"
+                },
+                "errorCode": "200"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "if condition check_error",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"switch_execution_step\",\"error\":\"',activity('switch_execution_step')?.Error?.message,'\",\"status\":\"',activity('switch_execution_step')?.status,'\"}'),\nconcat('{\"activity_name\":\"if condition check_error\",\"error\":\"',activity('if condition check_error')?.Error?.message,'\",\"status\":\"',activity('if condition check_error')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "MASTER"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "file_pattern": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "execution_step_name": {
+        "type": "string"
+      },
+      "sheet_name": {
+        "type": "string"
+      },
+      "table_schema_name": {
+        "type": "string"
+      },
+      "filter_table_name": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "error_reason": {
+        "type": "String"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/MASTER_PIPELINE"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:30Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

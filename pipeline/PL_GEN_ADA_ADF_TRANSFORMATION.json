@@ -1,0 +1,826 @@
+{
+  "name": "PL_GEN_ADA_ADF_TRANSFORMATION",
+  "properties": {
+    "description": "PL_EXP_GEN_INSERT_STAGE",
+    "activities": [
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Read config params",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@concat(pipeline().parameters.tenantid,activity('Read master config').output.value[0]['file_meta']['suffix_cfg_params'])",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Lookup read adf transformations metadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Read config params",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@activity('Read master config').output.value[0]['folder_path']['fp_metadata']",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@concat(pipeline().parameters.tenantid,'_',pipeline().parameters.data_source,activity('Read master config').output.value[0]['file_meta']['suffix_metadata_template'])",
+                "type": "Expression"
+              },
+              "metadata_sheet": {
+                "value": "@pipeline().parameters.transformations_sheet_name",
+                "type": "Expression"
+              },
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "If Condition table filter exists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ForEach append unique table details",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(equals(pipeline().parameters.filter_table_name,''),empty(pipeline().parameters.filter_table_name))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Filter transformation sheet with table name",
+              "type": "Filter",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "items": {
+                  "value": "@variables('TablesArray')",
+                  "type": "Expression"
+                },
+                "condition": {
+                  "value": "@equals(item().target_table_name,pipeline().parameters.filter_table_name)",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Set variable filtered table details",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Filter transformation sheet with table name",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "FilteredArray",
+                "value": {
+                  "value": "@activity('Filter transformation sheet with table name').output.value",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifTrueActivities": [
+            {
+              "name": "Set variable no filter process entire sheet",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "FilteredArray",
+                "value": {
+                  "value": "@variables('TablesArray')",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ForEach append unique table details",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Lookup read adf transformations metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup read adf transformations metadata').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "If Condition check duplicate rows in trans sheet",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "value": "@contains(join(variables('CheckExistsArray'), ','), item().target_table_name)\n",
+                  "type": "Expression"
+                },
+                "ifFalseActivities": [
+                  {
+                    "name": "Append variable teamp table name",
+                    "type": "AppendVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "CheckExistsArray",
+                      "value": {
+                        "value": "@item().target_table_name",
+                        "type": "Expression"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Append variable table details",
+                    "type": "AppendVariable",
+                    "dependsOn": [
+                      {
+                        "activity": "Append variable teamp table name",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "TablesArray",
+                      "value": {
+                        "value": "@json(concat('{\"target_table_name\" :\"',item().target_table_name,'\",','\"source_table_name\" :\"',item().source_table_name,'\",','\"columns_schema_sheet_name\" :\"',item().columns_schema_sheet_name,'\"}'))\n\n",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Append system_error ForEach append unique table details",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "If Condition check duplicate rows in trans sheet",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"If Condition check duplicate rows in trans sheet\",\"error\":\"',activity('If Condition check duplicate rows in trans sheet')?.Error?.message,'\",\"status\":\"',activity('If Condition check duplicate rows in trans sheet')?.status,'\"}'),\nconcat('{\"activity_name\":\"Append variable teamp table name\",\"error\":\"',activity('Append variable teamp table name')?.Error?.message,'\",\"status\":\"',activity('Append variable teamp table name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Append variable table details\",\"error\":\"',activity('Append variable table details')?.Error?.message,'\",\"status\":\"',activity('Append variable table details')?.status,'\"}')\n\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach append unique table details",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach append unique table details",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ForEach target table perform transformations",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "If Condition table filter exists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@variables('FilteredArray')",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "DF get dyamic parameters trans",
+              "type": "ExecuteDataFlow",
+              "dependsOn": [
+                {
+                  "activity": "Lookup get delta column names",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "dataflow": {
+                  "referenceName": "DF_GEN_ADA_TRANS_DYN_PARAMS",
+                  "type": "DataFlowReference",
+                  "parameters": {
+                    "TableName": {
+                      "value": "'@{item().target_table_name}'",
+                      "type": "Expression"
+                    },
+                    "Col_names": {
+                      "value": "'@{replace(replace(join(activity('Lookup get delta column names').output.value, ','), '{\"col_name\":\"', ''), '\"}', '')}'",
+                      "type": "Expression"
+                    }
+                  },
+                  "datasetParameters": {
+                    "tranformrules": {
+                      "container_name": {
+                        "value": "@pipeline().globalParameters.container_name",
+                        "type": "Expression"
+                      },
+                      "metadata_folder": {
+                        "value": "@activity('Read master config').output.value[0]['folder_path']['fp_metadata']",
+                        "type": "Expression"
+                      },
+                      "metadata_file": {
+                        "value": "@concat(pipeline().parameters.tenantid,'_',pipeline().parameters.data_source,activity('Read master config').output.value[0]['file_meta']['suffix_metadata_template'])",
+                        "type": "Expression"
+                      },
+                      "metadata_sheet": {
+                        "value": "@pipeline().parameters.transformations_sheet_name",
+                        "type": "Expression"
+                      },
+                      "storage_name": {
+                        "value": "@pipeline().globalParameters.storage_account_name",
+                        "type": "Expression"
+                      },
+                      "kv_name": {
+                        "value": "@pipeline().globalParameters.keyvault_name",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                "integrationRuntime": {
+                  "referenceName": "IR-Private",
+                  "type": "IntegrationRuntimeReference"
+                },
+                "traceLevel": "None",
+                "cacheSinks": {
+                  "firstRowOnly": true
+                }
+              }
+            },
+            {
+              "name": "DF insert into transformed table",
+              "type": "ExecuteDataFlow",
+              "dependsOn": [
+                {
+                  "activity": "DF get dyamic parameters trans",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "dataflow": {
+                  "referenceName": "DF_GEN_ADA_ADF_TRANSFORMATION",
+                  "type": "DataFlowReference",
+                  "parameters": {
+                    "columnnames": {
+                      "value": "@string(activity('DF get dyamic parameters trans').output.runStatus.output.cachdynmcols.value[0].ColumnName)",
+                      "type": "Expression"
+                    },
+                    "columnexpression": {
+                      "value": "'@{activity('DF get dyamic parameters trans').output.runStatus.output.cachdynmcols.value[0].Exprvalue}'",
+                      "type": "Expression"
+                    },
+                    "adls_delta_source_path": {
+                      "value": "'@{concat('delta_files/',pipeline().parameters.data_source,'/',item().source_table_name)}'",
+                      "type": "Expression"
+                    },
+                    "adls_delta_target_path": {
+                      "value": "'@{concat('delta_files/',pipeline().parameters.data_source,'/',item().target_table_name)}'",
+                      "type": "Expression"
+                    },
+                    "adls_container_name": {
+                      "value": "'@{pipeline().globalParameters.container_name}'",
+                      "type": "Expression"
+                    },
+                    "merge_schema_flag": {
+                      "value": "@activity('Read config params').output.value[0]['deferredincome']['transformations']['adf_delta_merge_flag']",
+                      "type": "Expression"
+                    },
+                    "auto_compact": {
+                      "value": "@activity('Read config params').output.value[0]['deferredincome']['transformations']['adf_delta_auto_compact']",
+                      "type": "Expression"
+                    },
+                    "optimize_write": {
+                      "value": "@activity('Read config params').output.value[0]['deferredincome']['transformations']['adf_delta_optimize_write']",
+                      "type": "Expression"
+                    }
+                  },
+                  "linkedServiceParameters": {
+                    "GetSourceData": {
+                      "linkedService": {
+                        "storage_name": {
+                          "value": "@pipeline().globalParameters.storage_account_name",
+                          "type": "Expression"
+                        },
+                        "kv_name": {
+                          "value": "@pipeline().globalParameters.keyvault_name",
+                          "type": "Expression"
+                        }
+                      }
+                    },
+                    "StageClean": {
+                      "linkedService": {
+                        "storage_name": {
+                          "value": "@pipeline().globalParameters.storage_account_name",
+                          "type": "Expression"
+                        },
+                        "kv_name": {
+                          "value": "@pipeline().globalParameters.keyvault_name",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  }
+                },
+                "integrationRuntime": {
+                  "referenceName": "IR-Private",
+                  "type": "IntegrationRuntimeReference"
+                },
+                "traceLevel": "Fine"
+              }
+            },
+            {
+              "name": "Nb create delta table if not exists",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/ingestion/delta_tables')",
+                  "type": "Expression"
+                },
+                "baseParameters": {
+                  "file_path": {
+                    "value": "@concat('dbfs:/mnt/',pipeline().globalParameters.storage_account_name,'/',pipeline().parameters.tenantid,'/delta_files/',pipeline().parameters.data_source)",
+                    "type": "Expression"
+                  },
+                  "schema_name": {
+                    "value": "@pipeline().parameters.schema_name",
+                    "type": "Expression"
+                  },
+                  "table_names": {
+                    "value": "@item().target_table_name",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "LS_ADA_ADB",
+                "type": "LinkedServiceReference",
+                "parameters": {
+                  "kv_name": {
+                    "value": "@pipeline().globalParameters.keyvault_name",
+                    "type": "Expression"
+                  },
+                  "adb_url": {
+                    "value": "@pipeline().parameters.adb_url",
+                    "type": "Expression"
+                  },
+                  "adb_cluster_id": {
+                    "value": "@pipeline().parameters.adb_cluster_id",
+                    "type": "Expression"
+                  },
+                  "adb_token_kv": {
+                    "value": "@pipeline().parameters.adb_token_kv",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Lookup get delta column names",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "Nb create delta table if not exists",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureDatabricksDeltaLakeSource",
+                  "query": {
+                    "value": "@concat('show columns IN ',pipeline().parameters.schema_name,'.',item().source_table_name)",
+                    "type": "Expression"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "SchemaName": {
+                      "value": "@pipeline().parameters.schema_name",
+                      "type": "Expression"
+                    },
+                    "TableName": {
+                      "value": "@item().source_table_name",
+                      "type": "Expression"
+                    },
+                    "adb_url": {
+                      "value": "@pipeline().parameters.adb_url",
+                      "type": "Expression"
+                    },
+                    "adb_cluster_id": {
+                      "value": "@pipeline().parameters.adb_cluster_id",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "firstRowOnly": false
+              }
+            },
+            {
+              "name": "Append system_error ForEach target table perform agg",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "DF insert into transformed table",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Nb create delta table if not exists\",\"error\":\"',activity('Nb create delta table if not exists')?.Error?.message,'\",\"status\":\"',activity('Nb create delta table if not exists')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup get delta column names\",\"error\":\"',activity('Lookup get delta column names')?.Error?.message,'\",\"status\":\"',activity('Lookup get delta column names')?.status,'\"}'),\nconcat('{\"activity_name\":\"DF get dyamic parameters trans\",\"error\":\"',activity('DF get dyamic parameters trans')?.Error?.message,'\",\"status\":\"',activity('DF get dyamic parameters trans')?.status,'\"}'),\nconcat('{\"activity_name\":\"DF insert into transformed table\",\"error\":\"',activity('DF insert into transformed table')?.Error?.message,'\",\"status\":\"',activity('DF insert into transformed table')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach target table perform agg",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach target table perform agg",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEach target table perform transformations",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Read config params\",\"error\":\"',activity('Read config params')?.Error?.message,'\",\"status\":\"',activity('Read config params')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup read adf transformations metadata\",\"error\":\"',activity('Lookup read adf transformations metadata')?.Error?.message,'\",\"status\":\"',activity('Lookup read adf transformations metadata')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach append unique table details\",\"error\":\"',activity('ForEach append unique table details')?.Error?.message,'\",\"status\":\"',activity('ForEach append unique table details')?.status,'\"}'),\nconcat('{\"activity_name\":\"If Condition table filter exists\",\"error\":\"',activity('If Condition table filter exists')?.Error?.message,'\",\"status\":\"',activity('If Condition table filter exists')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable no filter process entire sheet\",\"error\":\"',activity('Set variable no filter process entire sheet')?.Error?.message,'\",\"status\":\"',activity('Set variable no filter process entire sheet')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter transformation sheet with table name\",\"error\":\"',activity('Filter transformation sheet with table name')?.Error?.message,'\",\"status\":\"',activity('Filter transformation sheet with table name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable filtered table details\",\"error\":\"',activity('Set variable filtered table details')?.Error?.message,'\",\"status\":\"',activity('Set variable filtered table details')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach target table perform transformations\",\"error\":\"',activity('ForEach target table perform transformations')?.Error?.message,'\",\"status\":\"',activity('ForEach target table perform transformations')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "stage_name": "TRANSFORMATION"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "file_pattern": {
+        "type": "string"
+      },
+      "tenantid": {
+        "type": "string"
+      },
+      "transformations_sheet_name": {
+        "type": "string"
+      },
+      "filter_table_name": {
+        "type": "string"
+      },
+      "schema_name": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "TablesArray": {
+        "type": "Array"
+      },
+      "FilterExists": {
+        "type": "String"
+      },
+      "CheckExistsArray": {
+        "type": "Array"
+      },
+      "FilteredArray": {
+        "type": "Array"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/TRANSFORMATION"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-09-25T05:00:23Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}
