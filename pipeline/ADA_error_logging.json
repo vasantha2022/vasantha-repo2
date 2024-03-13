@@ -1,0 +1,197 @@
+{
+  "name": "PL_GEN_ADA_ADF_ERROR_LOGS",
+  "properties": {
+    "activities": [
+      {
+        "name": "Filter Error",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@pipeline().parameters.Log",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@equals(item().status,'Failed')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "ForEach Error",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Filter Error",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Filter error').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Lookup Insert Error",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "value": "INSERT INTO @{activity('Read master config').output.value[0].monitor_sql_details['schema']}.@{activity('Read master config').output.value[0].monitor_sql_details['table_sys_error']}\n(PROCESSING_DATE,\nDATA_SOURCE,\nDATA_SOURCE_TYPE,\nSTAGE_NAME,\nLOG_CREATION_DATETIME,\nERROR_TYPE,\nERROR_DESCRIPTION,\nLOG_PARENT_RUN_ID,\nEXECUTION_END_TIME)\nVALUES\n('@{utcnow('yyyy-MM-dd')}',\n'@{pipeline().parameters.data_source}',\n'@{pipeline().parameters.data_source_type}',\n'@{pipeline().parameters.stage_name}',\n'@{utcnow('yyyy-MM-dd HH:mm:ss')}',\n'@{concat(string(item().activity_name),' ',string(item().status))}',\n'@{replace(string(item().error),'''','')}',\n'@{pipeline().parameters.log_parent_run_id}',\n'@{utcnow('yyyy-MM-dd HH:mm:ss')}');\nSELECT 'RECORD INSERTED' AS status;",
+                    "type": "Expression"
+                  },
+                  "queryTimeout": "02:00:00",
+                  "partitionOption": "None"
+                },
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_AZURE_SQL_DB",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "table_name": {
+                      "value": "@activity('Read master config').output.value[0].monitor_sql_details['table_sys_error']",
+                      "type": "Expression"
+                    },
+                    "schema_name": {
+                      "value": "@activity('Read master config').output.value[0].monitor_sql_details['schema']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "kv_secret_conn_str": {
+                      "value": "@activity('Read master config').output.value[0].keyvault_credentials['sql-conn-str']",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "firstRowOnly": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Fail Error Log Pipeline",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "ForEach Error",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "message": "Explicit Fail - Error Record Inserted Successfully - Check System Error Table",
+          "errorCode": "000"
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      }
+    ],
+    "parameters": {
+      "Log": {
+        "type": "object"
+      },
+      "data_source": {
+        "type": "string",
+        "defaultValue": null
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "data_source_type": {
+        "type": "string",
+        "defaultValue": null
+      },
+      "stage_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/MONITORING"
+    },
+    "annotations": []
+  }
+}
