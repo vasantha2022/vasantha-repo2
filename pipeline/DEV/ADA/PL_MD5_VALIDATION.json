@@ -1,0 +1,374 @@
+{
+  "name": "PL_MD5_VALIDATION",
+  "properties": {
+    "activities": [
+      {
+        "name": "md5_validation",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/ingestion/md5_validation')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "file_pattern": {
+              "value": "@pipeline().parameters.file_pattern",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "date_path": {
+              "value": "@pipeline().parameters.date_path",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_table_name": {
+              "value": "@pipeline().parameters.log_table_name",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@pipeline().parameters.adb_url",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@pipeline().parameters.adb_cluster_id",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@pipeline().parameters.adb_token_kv",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Array Appending Md5 Matched Files",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "md5_validation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "MactchedMd5",
+          "value": {
+            "value": "@activity('md5_validation').output.runOutput.Md5Matched",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Foreach copy macthed md5 files",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Array Appending Md5 Matched Files",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@variables('MactchedMd5')",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Copy matchedt files adls to converted folder",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "AzureBlobFSReadSettings",
+                    "recursive": true
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "AzureBlobFSWriteSettings"
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_ADLS_BINARYFIL",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "container_name": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    },
+                    "folder_path": {
+                      "value": "@concat('landing_zone/',toLower(pipeline().parameters.source_type),'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path)",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@item()",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_ADLS_BINARYFIL",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "container_name": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    },
+                    "folder_path": {
+                      "value": "@concat('landing_zone/',toLower(pipeline().parameters.source_type),'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path,'/converted')",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@item()",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Append system_error ForEach target table perform agg",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Copy matchedt files adls to converted folder",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Copy matchedt files adls to converted folder\",\"error\":\"',activity('Copy matchedt files adls to converted folder')?.Error?.message,'\",\"status\":\"',activity('Copy matchedt files adls to converted folder')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach target table perform agg",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach target table perform agg",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Foreach copy macthed md5 files",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"md5_validation\",\"error\":\"',activity('md5_validation')?.Error?.message,'\",\"status\":\"',activity('md5_validation')?.status,'\"}'),\nconcat('{\"activity_name\":\"Array Appending Md5 Matched Files\",\"error\":\"',activity('Array Appending Md5 Matched Files')?.Error?.message,'\",\"status\":\"',activity('Array Appending Md5 Matched Files')?.status,'\"}'),\nconcat('{\"activity_name\":\"Foreach copy macthed md5 files\",\"error\":\"',activity('Foreach copy macthed md5 files')?.Error?.message,'\",\"status\":\"',activity('Foreach copy macthed md5 files')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "MD5_VALIDATION"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "file_pattern": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "MactchedMd5": {
+        "type": "Array"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/MD5_VALIDATION"
+    },
+    "annotations": []
+  }
+}

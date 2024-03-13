@@ -1,0 +1,496 @@
+{
+  "name": "PL_FILE_CONVERSION_MASTER",
+  "properties": {
+    "activities": [
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Get Metadata adls folder",
+        "type": "GetMetadata",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_BINARY",
+            "type": "DatasetReference",
+            "parameters": {
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "folder_path": {
+                "value": "@concat(activity('Read master config').output.value[0].folder_path['fp_landing_zone'],pipeline().parameters.source_type,'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path,'/converted')",
+                "type": "Expression"
+              }
+            }
+          },
+          "fieldList": [
+            "childItems"
+          ],
+          "storeSettings": {
+            "type": "AzureBlobFSReadSettings",
+            "recursive": true,
+            "enablePartitionDiscovery": false
+          },
+          "formatSettings": {
+            "type": "BinaryReadSettings"
+          }
+        }
+      },
+      {
+        "name": "ForEach append unique table details",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Get Metadata adls folder",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Get Metadata adls folder').output.childItems",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "If Condition check file extension",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "value": "@contains(join(variables('CheckExistsArray'), ','),if(or(endswith(tolower(item().name),'.csv'),endswith(tolower(item().name),'.txt')),'' ,last(array(split(tolower(item().name),'.'))) ))",
+                  "type": "Expression"
+                },
+                "ifFalseActivities": [
+                  {
+                    "name": "Append variable file extension",
+                    "type": "AppendVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "CheckExistsArray",
+                      "value": {
+                        "value": "@if(or(endswith(tolower(item().name),'.csv'),endswith(tolower(item().name),'.txt')),'' ,last(array(split(tolower(item().name),'.'))) )",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Append system_error ForEach append unique table details",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "If Condition check file extension",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"If Condition check file extension\",\"error\":\"',activity('If Condition check file extension')?.Error?.message,'\",\"status\":\"',activity('If Condition check file extension')?.status,'\"}'),\nconcat('{\"activity_name\":\"Append variable file extension\",\"error\":\"',activity('Append variable file extension')?.Error?.message,'\",\"status\":\"',activity('Append variable file extension')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach append unique table details",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach append unique table details",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ForEach file ext execute conversion pipeline",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "ForEach append unique table details",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@variables('CheckExistsArray')",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Switch file conversion pipeline",
+              "type": "Switch",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "on": {
+                  "value": "@item()",
+                  "type": "Expression"
+                },
+                "cases": [
+                  {
+                    "value": "json",
+                    "activities": [
+                      {
+                        "name": "Execute Pipeline json conersion pipeline",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "policy": {
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "pipeline": {
+                            "referenceName": "PL_JSON_FILE_CONVERSION",
+                            "type": "PipelineReference"
+                          },
+                          "waitOnCompletion": true,
+                          "parameters": {
+                            "log_parent_run_id": {
+                              "value": "@pipeline().parameters.log_parent_run_id",
+                              "type": "Expression"
+                            },
+                            "file_pattern": {
+                              "value": "@pipeline().parameters.file_pattern",
+                              "type": "Expression"
+                            },
+                            "tenant_id": {
+                              "value": "@pipeline().parameters.tenant_id",
+                              "type": "Expression"
+                            },
+                            "source_type": {
+                              "value": "@pipeline().parameters.source_type",
+                              "type": "Expression"
+                            },
+                            "date_path": {
+                              "value": "@pipeline().parameters.date_path",
+                              "type": "Expression"
+                            },
+                            "data_source": {
+                              "value": "@pipeline().parameters.data_source",
+                              "type": "Expression"
+                            },
+                            "adb_url": {
+                              "value": "@pipeline().parameters.adb_url",
+                              "type": "Expression"
+                            },
+                            "adb_cluster_id": {
+                              "value": "@pipeline().parameters.adb_cluster_id",
+                              "type": "Expression"
+                            },
+                            "adb_token_kv": {
+                              "value": "@pipeline().parameters.adb_token_kv",
+                              "type": "Expression"
+                            },
+                            "adb_repo_url": {
+                              "value": "@pipeline().parameters.adb_repo_url",
+                              "type": "Expression"
+                            },
+                            "log_table_name": {
+                              "value": "@pipeline().parameters.log_table_name",
+                              "type": "Expression"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "Append system_error Switch conversion pipeline json",
+                        "type": "AppendVariable",
+                        "dependsOn": [
+                          {
+                            "activity": "Execute Pipeline json conersion pipeline",
+                            "dependencyConditions": [
+                              "Skipped",
+                              "Failed"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "variableName": "system_error",
+                          "value": {
+                            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Execute Pipeline json conersion pipeline\",\"error\":\"',activity('Execute Pipeline json conersion pipeline')?.Error?.message,'\",\"status\":\"',activity('Execute Pipeline json conersion pipeline')?.status,'\"}')\n),',')",
+                            "type": "Expression"
+                          }
+                        }
+                      },
+                      {
+                        "name": "Fail Switch conversion pipeline json",
+                        "type": "Fail",
+                        "dependsOn": [
+                          {
+                            "activity": "Append system_error Switch conversion pipeline json",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "message": "Explicit Fail for Switch Case",
+                          "errorCode": "00000"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Append system_error ForEach file ext execute conversion",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Switch file conversion pipeline",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Switch file conversion pipeline\",\"error\":\"',activity('Switch file conversion pipeline')?.Error?.message,'\",\"status\":\"',activity('Switch file conversion pipeline')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach file ext execute conversion pipeline",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach file ext execute conversion",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEach file ext execute conversion pipeline",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get Metadata adls folder\",\"error\":\"',activity('Get Metadata adls folder')?.Error?.message,'\",\"status\":\"',activity('Get Metadata adls folder')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach append unique table details\",\"error\":\"',activity('ForEach append unique table details')?.Error?.message,'\",\"status\":\"',activity('ForEach append unique table details')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach file ext execute conversion pipeline\",\"error\":\"',activity('ForEach file ext execute conversion pipeline')?.Error?.message,'\",\"status\":\"',activity('ForEach file ext execute conversion pipeline')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "FILE_CONVERSION"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "file_pattern": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "CheckExistsArray": {
+        "type": "Array"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/FILE_CONVERSION"
+    },
+    "annotations": []
+  }
+}

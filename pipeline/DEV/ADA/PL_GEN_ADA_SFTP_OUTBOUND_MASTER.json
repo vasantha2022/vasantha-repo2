@@ -1,0 +1,615 @@
+{
+  "name": "PL_GEN_ADA_SFTP_OUTBOUND_MASTER",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup SFTP Metadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@activity('Read master config').output.value[0].folder_path.fp_metadata",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_pre_ingestion)",
+                "type": "Expression"
+              },
+              "metadata_sheet": {
+                "value": "@toUpper('SFTP')",
+                "type": "Expression"
+              },
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Filter Active_flag",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "Lookup SFTP Metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup SFTP Metadata').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@and(equals(item().active_flag,'1'),equals(toLower(item().data_source),toLower(pipeline().parameters.filter_table_name)))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "ForEach datasource",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Filter Active_flag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Filter Active_flag').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Switch SFTP based on auth type",
+              "type": "Switch",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "on": {
+                  "value": "@toLower(item().auth_type)",
+                  "type": "Expression"
+                },
+                "cases": [
+                  {
+                    "value": "sftp-basic",
+                    "activities": [
+                      {
+                        "name": "Execute SFTP Ingestion basic auth",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "policy": {
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "pipeline": {
+                            "referenceName": "PL_GEN_ADA_SFTP_OUTBOUND_BASIC_AUTH",
+                            "type": "PipelineReference"
+                          },
+                          "waitOnCompletion": true,
+                          "parameters": {
+                            "system_name": {
+                              "value": "@item().system_name",
+                              "type": "Expression"
+                            },
+                            "adls_file_path": {
+                              "value": "@concat(activity('Read master config').output.value[0].folder_path['fp_landing_zone'],pipeline().parameters.source_type,'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path)",
+                              "type": "Expression"
+                            },
+                            "file_pattern": {
+                              "value": "@pipeline().parameters.file_pattern",
+                              "type": "Expression"
+                            },
+                            "sftp_file_path": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].input_file_path)",
+                              "type": "Expression"
+                            },
+                            "config_file_path": {
+                              "value": "@activity('Read master config').output.value[0].folder_path.fp_config",
+                              "type": "Expression"
+                            },
+                            "config_file_name": {
+                              "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_ingestion_credentials)",
+                              "type": "Expression"
+                            },
+                            "tenant_id": {
+                              "value": "@pipeline().parameters.tenant_id",
+                              "type": "Expression"
+                            },
+                            "log_parent_run_id": {
+                              "value": "@pipeline().parameters.log_parent_run_id",
+                              "type": "Expression"
+                            },
+                            "source_type": {
+                              "value": "@pipeline().parameters.source_type",
+                              "type": "Expression"
+                            },
+                            "adb_url": {
+                              "value": "@pipeline().parameters.adb_url",
+                              "type": "Expression"
+                            },
+                            "adb_cluster_id": {
+                              "value": "@pipeline().parameters.adb_cluster_id",
+                              "type": "Expression"
+                            },
+                            "adb_token_kv": {
+                              "value": "@pipeline().parameters.adb_token_kv",
+                              "type": "Expression"
+                            },
+                            "adb_repo_url": {
+                              "value": "@pipeline().parameters.adb_repo_url",
+                              "type": "Expression"
+                            },
+                            "date_path": {
+                              "value": "@pipeline().parameters.date_path",
+                              "type": "Expression"
+                            },
+                            "data_source": {
+                              "value": "@pipeline().parameters.data_source",
+                              "type": "Expression"
+                            },
+                            "auth_type": {
+                              "value": "@toLower(item().auth_type)",
+                              "type": "Expression"
+                            },
+                            "sftp_Index_filepath": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].input_index_json_path)",
+                              "type": "Expression"
+                            },
+                            "indexfile_flag": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].indexfile_flag)",
+                              "type": "Expression"
+                            },
+                            "error_log_flag": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].error_log_flag)",
+                              "type": "Expression"
+                            },
+                            "error_filepath": {
+                              "value": "@concat(activity('Read master config').output.value[0].folder_path['fp_landing_zone'],pipeline().parameters.source_type,'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path,'/error_logs')",
+                              "type": "Expression"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "Append system_error Switch sftpbasic",
+                        "type": "AppendVariable",
+                        "dependsOn": [
+                          {
+                            "activity": "Execute SFTP Ingestion basic auth",
+                            "dependencyConditions": [
+                              "Skipped",
+                              "Failed"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "variableName": "system_error",
+                          "value": {
+                            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Execute SFTP Ingestion basic auth\",\"error\":\"',activity('Execute SFTP Ingestion basic auth')?.Error?.message,'\",\"status\":\"',activity('Execute SFTP Ingestion basic auth')?.status,'\"}')\n),',')",
+                            "type": "Expression"
+                          }
+                        }
+                      },
+                      {
+                        "name": "Fail Switch sftpbasic",
+                        "type": "Fail",
+                        "dependsOn": [
+                          {
+                            "activity": "Append system_error Switch sftpbasic",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "message": "Explicit Fail for Switch Case",
+                          "errorCode": "00000"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "value": "sftp-ssh-key",
+                    "activities": [
+                      {
+                        "name": "Execute SFTP Outbound SSH key",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "policy": {
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "pipeline": {
+                            "referenceName": "PL_GEN_ADA_SFTP_OUTBOUND_SSH_KEY",
+                            "type": "PipelineReference"
+                          },
+                          "waitOnCompletion": true,
+                          "parameters": {
+                            "system_name": {
+                              "value": "@item().system_name",
+                              "type": "Expression"
+                            },
+                            "adls_file_path": {
+                              "value": "@concat(activity('Read master config').output.value[0].folder_path['fp_landing_zone'],pipeline().parameters.source_type,'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path)",
+                              "type": "Expression"
+                            },
+                            "file_pattern": {
+                              "value": "@pipeline().parameters.file_pattern",
+                              "type": "Expression"
+                            },
+                            "sftp_file_path": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].input_file_path)",
+                              "type": "Expression"
+                            },
+                            "config_file_path": {
+                              "value": "@activity('Read master config').output.value[0].folder_path.fp_config",
+                              "type": "Expression"
+                            },
+                            "config_file_name": {
+                              "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_ingestion_credentials)",
+                              "type": "Expression"
+                            },
+                            "tenant_id": {
+                              "value": "@pipeline().parameters.tenant_id",
+                              "type": "Expression"
+                            },
+                            "log_parent_run_id": {
+                              "value": "@pipeline().parameters.log_parent_run_id",
+                              "type": "Expression"
+                            },
+                            "source_type": {
+                              "value": "@pipeline().parameters.source_type",
+                              "type": "Expression"
+                            },
+                            "adb_url": {
+                              "value": "@pipeline().parameters.adb_url",
+                              "type": "Expression"
+                            },
+                            "adb_cluster_id": {
+                              "value": "@pipeline().parameters.adb_cluster_id",
+                              "type": "Expression"
+                            },
+                            "adb_token_kv": {
+                              "value": "@pipeline().parameters.adb_token_kv",
+                              "type": "Expression"
+                            },
+                            "adb_repo_url": {
+                              "value": "@pipeline().parameters.adb_repo_url",
+                              "type": "Expression"
+                            },
+                            "date_path": {
+                              "value": "@pipeline().parameters.date_path",
+                              "type": "Expression"
+                            },
+                            "data_source": {
+                              "value": "@pipeline().parameters.data_source",
+                              "type": "Expression"
+                            },
+                            "auth_type": {
+                              "value": "@toLower(item().auth_type)",
+                              "type": "Expression"
+                            },
+                            "sftp_Index_filepath": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].input_index_json_path)",
+                              "type": "Expression"
+                            },
+                            "indexfile_flag": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].indexfile_flag)",
+                              "type": "Expression"
+                            },
+                            "error_log_flag": {
+                              "value": "@concat(activity('Filter Active_flag').output.value[0].error_log_flag)",
+                              "type": "Expression"
+                            },
+                            "error_filepath": {
+                              "value": "@concat(activity('Read master config').output.value[0].folder_path['fp_landing_zone'],pipeline().parameters.source_type,'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path,'/error_logs')",
+                              "type": "Expression"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "Append system_error Switch sftpsshkey",
+                        "type": "AppendVariable",
+                        "dependsOn": [
+                          {
+                            "activity": "Execute SFTP Outbound SSH key",
+                            "dependencyConditions": [
+                              "Skipped",
+                              "Failed"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "variableName": "system_error",
+                          "value": {
+                            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Execute SFTP Outbound SSH key\",\"error\":\"',activity('Execute SFTP Outbound SSH key')?.Error?.message,'\",\"status\":\"',activity('Execute SFTP Outbound SSH key')?.status,'\"}')\n),',')",
+                            "type": "Expression"
+                          }
+                        }
+                      },
+                      {
+                        "name": "Fail Switch sftpsshkey",
+                        "type": "Fail",
+                        "dependsOn": [
+                          {
+                            "activity": "Append system_error Switch sftpsshkey",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "message": "Explicit Fail for Switch Case",
+                          "errorCode": "00000"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Append system_error ForEach datasource",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Switch SFTP based on auth type",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Switch SFTP based on auth type\",\"error\":\"',activity('Switch SFTP based on auth type')?.Error?.message,'\",\"status\":\"',activity('Switch SFTP based on auth type')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach datasource",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach datasource",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEach datasource",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup SFTP Metadata\",\"error\":\"',activity('Lookup SFTP Metadata')?.Error?.message,'\",\"status\":\"',activity('Lookup SFTP Metadata')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter Active_flag\",\"error\":\"',activity('Filter Active_flag')?.Error?.message,'\",\"status\":\"',activity('Filter Active_flag')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach datasource\",\"error\":\"',activity('ForEach datasource')?.Error?.message,'\",\"status\":\"',activity('ForEach datasource')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "SFTP_OUTBOUND"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "file_pattern": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "filter_table_name": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "error_flag_filename": {
+        "type": "String"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/SFTP_OUTBOUND"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:30Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}
