@@ -1,0 +1,57 @@
+{
+  "name": "DS_GEN_ADA_DELTA_LAKE",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_ADA_ADB_DELTA_LAKE",
+      "type": "LinkedServiceReference",
+      "parameters": {
+        "kv_name": {
+          "value": "@dataset().kv_name",
+          "type": "Expression"
+        },
+        "adb_url": {
+          "value": "@dataset().adb_url",
+          "type": "Expression"
+        },
+        "adb_cluster_id": {
+          "value": "@dataset().adb_cluster_id",
+          "type": "Expression"
+        }
+      }
+    },
+    "parameters": {
+      "kv_name": {
+        "type": "string"
+      },
+      "SchemaName": {
+        "type": "string"
+      },
+      "TableName": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      }
+    },
+    "folder": {
+      "name": "DS_ADA"
+    },
+    "annotations": [],
+    "type": "AzureDatabricksDeltaLakeDataset",
+    "typeProperties": {
+      "database": {
+        "value": "@dataset().SchemaName",
+        "type": "Expression"
+      },
+      "table": {
+        "value": "@dataset().TableName",
+        "type": "Expression"
+      }
+    },
+    "schema": []
+  },
+  "type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,1387 @@
+{
+  "name": "PL_GEN_ADA_SFTP_INGESTION_SSH_KEY",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup ingestion creds config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@pipeline().parameters.config_file_path",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@pipeline().parameters.config_file_name",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Web Get SFTP User Name",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_user_name_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Web Get SFTP Hostname",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_host_name_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Get Blob Container Name",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',pipeline().parameters.blob_container_name,'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Get Blob Storage account name",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',pipeline().parameters.blob_storage_name,'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Iterate on file names",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "If Condition check index json file",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@variables('filenames_filtered')",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "append file_names",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Copy From SFTP",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "filenames_list",
+                "value": {
+                  "value": "@item()",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "failed files",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Copy From SFTP",
+                  "dependencyConditions": [
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "filenames_list",
+                "value": {
+                  "value": "@item()",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Copy From SFTP",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "SftpReadSettings",
+                    "recursive": true,
+                    "deleteFilesAfterCompletion": false,
+                    "disableChunking": false
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "AzureBlobStorageWriteSettings"
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.input_file_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@split(item(),'||')[0]",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@activity('Get Web port number').output.value",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_BLOB_BINARY_EACH_FILE",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "container_name": {
+                      "value": "@activity('Get Blob Container Name').output.value",
+                      "type": "Expression"
+                    },
+                    "folder_path": {
+                      "value": "@pipeline().parameters.output_file_path",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@split(item(),'||')[1]",
+                      "type": "Expression"
+                    },
+                    "storage_name": {
+                      "value": "@activity('Get Blob Storage account name').output.value",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "SSH KEY Move files From SFTP INPUT to ARCHIVE",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "Copy From SFTP",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "SftpReadSettings",
+                    "recursive": true,
+                    "deleteFilesAfterCompletion": true,
+                    "disableChunking": false
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "SftpWriteSettings",
+                    "operationTimeout": "01:00:00",
+                    "useTempFileRename": true
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.input_file_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@split(item(),'||')[0]",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@activity('Get Web port number').output.value",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@replace(pipeline().parameters.input_file_path,'INPUT','ARCHIVE')",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@split(item(),'||')[0]",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@activity('Get Web port number').output.value",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Append system_error ForEach datasource",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Wait1",
+                  "dependencyConditions": [
+                    "Skipped"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Copy From SFTP\",\"error\":\"',activity('Copy From SFTP')?.Error?.message,'\",\"status\":\"',activity('Copy From SFTP')?.status,'\"}'),\nconcat('{\"activity_name\":\"SSH KEY Move files From SFTP INPUT to ARCHIVE\",\"error\":\"',activity('SSH KEY Move files From SFTP INPUT to ARCHIVE')?.Error?.message,'\",\"status\":\"',activity('SSH KEY Move files From SFTP INPUT to ARCHIVE')?.status,'\"}'),\nconcat('{\"activity_name\":\"append file_names\",\"error\":\"',activity('append file_names')?.Error?.message,'\",\"status\":\"',activity('append file_names')?.status,'\"}'),\nconcat('{\"activity_name\":\"failed files\",\"error\":\"',activity('failed files')?.Error?.message,'\",\"status\":\"',activity('failed files')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach data source",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach datasource",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            },
+            {
+              "name": "Wait1",
+              "type": "Wait",
+              "dependsOn": [
+                {
+                  "activity": "append file_names",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "SSH KEY Move files From SFTP INPUT to ARCHIVE",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "failed files",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "waitTimeInSeconds": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "If Condition check index json file",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Get File names from folder",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@not(equals(trim(if(empty(pipeline().parameters.input_index_json_name),'',pipeline().parameters.input_index_json_name)),''))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Filter Filepattern",
+              "type": "Filter",
+              "dependsOn": [
+                {
+                  "activity": "Case Converter",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "items": {
+                  "value": "@split(activity('Case Converter').output.runOutput,'~~')",
+                  "type": "Expression"
+                },
+                "condition": {
+                  "value": "@contains(toLower(item()),toLower(pipeline().parameters.input_file_pattern))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Case Converter",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/utils/case_converter')",
+                  "type": "Expression"
+                },
+                "baseParameters": {
+                  "input_file_string": {
+                    "value": "@string(activity('Get File names from folder').output.childItems)",
+                    "type": "Expression"
+                  },
+                  "replace_values": {
+                    "value": "@pipeline().parameters.replace_special_values",
+                    "type": "Expression"
+                  },
+                  "input_type": "json",
+                  "file_pattern": {
+                    "value": "@pipeline().parameters.input_file_pattern",
+                    "type": "Expression"
+                  },
+                  "accepted_source_file_ext": {
+                    "value": "@string(pipeline().parameters.accepted_source_file_ext)",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "LS_ADA_ADB",
+                "type": "LinkedServiceReference",
+                "parameters": {
+                  "kv_name": {
+                    "value": "@pipeline().globalParameters.keyvault_name",
+                    "type": "Expression"
+                  },
+                  "adb_url": {
+                    "value": "@pipeline().parameters.adb_url",
+                    "type": "Expression"
+                  },
+                  "adb_cluster_id": {
+                    "value": "@pipeline().parameters.adb_cluster_id",
+                    "type": "Expression"
+                  },
+                  "adb_token_kv": {
+                    "value": "@pipeline().parameters.adb_token_kv",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Filenames_filtered",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Filter Filepattern",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "filenames_filtered",
+                "value": {
+                  "value": "@activity('Filter Filepattern').output.Value",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifTrueActivities": [
+            {
+              "name": "read index json",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "Copy index json from sftp to blob",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "JsonSource",
+                  "storeSettings": {
+                    "type": "AzureBlobStorageReadSettings",
+                    "recursive": true,
+                    "enablePartitionDiscovery": false
+                  },
+                  "formatSettings": {
+                    "type": "JsonReadSettings"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_STA_BLOB_JSON",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.blob_storage_account_name",
+                      "type": "Expression"
+                    },
+                    "container_name": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@pipeline().parameters.input_index_json_name",
+                      "type": "Expression"
+                    },
+                    "folder_path": {
+                      "value": "@pipeline().parameters.output_file_path",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "firstRowOnly": false
+              }
+            },
+            {
+              "name": "case_converter_index_file",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "read index json",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/utils/case_converter_index_file')",
+                  "type": "Expression"
+                },
+                "baseParameters": {
+                  "input_file_string": {
+                    "value": "@string(activity('Get File names from folder').output.childItems)",
+                    "type": "Expression"
+                  },
+                  "replace_values": {
+                    "value": "@pipeline().parameters.replace_special_values",
+                    "type": "Expression"
+                  },
+                  "index_json": {
+                    "value": "@string(activity('read index json').output.value)",
+                    "type": "Expression"
+                  },
+                  "file_pattern": {
+                    "value": "@pipeline().parameters.input_file_pattern",
+                    "type": "Expression"
+                  },
+                  "accepted_source_file_ext": {
+                    "value": "@string(pipeline().parameters.accepted_source_file_ext)",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "LS_ADA_ADB",
+                "type": "LinkedServiceReference",
+                "parameters": {
+                  "kv_name": {
+                    "value": "@pipeline().globalParameters.keyvault_name",
+                    "type": "Expression"
+                  },
+                  "adb_url": {
+                    "value": "@pipeline().parameters.adb_url",
+                    "type": "Expression"
+                  },
+                  "adb_cluster_id": {
+                    "value": "@pipeline().parameters.adb_cluster_id",
+                    "type": "Expression"
+                  },
+                  "adb_token_kv": {
+                    "value": "@pipeline().parameters.adb_token_kv",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "filtered_filelist",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "case_converter_index_file",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "filenames_filtered",
+                "value": {
+                  "value": "@split(activity('case_converter_index_file').output.runOutput,'~~')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Copy index json from sftp to blob",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "SftpReadSettings",
+                    "recursive": true,
+                    "disableChunking": false
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "AzureBlobStorageWriteSettings"
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.input_index_json_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@pipeline().parameters.input_index_json_name",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_BLOB_BINARY_EACH_FILE",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "container_name": {
+                      "value": "@activity('Get Blob Container Name').output.value",
+                      "type": "Expression"
+                    },
+                    "folder_path": {
+                      "value": "@pipeline().parameters.output_file_path",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@pipeline().parameters.input_index_json_name",
+                      "type": "Expression"
+                    },
+                    "storage_name": {
+                      "value": "@activity('Get Blob Storage account name').output.value",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "SSH KEY MOVE index json file from INPUT to ARCHIVE",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "filtered_filelist",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "SftpReadSettings",
+                    "recursive": true,
+                    "deleteFilesAfterCompletion": true,
+                    "disableChunking": false
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "SftpWriteSettings",
+                    "operationTimeout": "01:00:00",
+                    "useTempFileRename": true
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.input_index_json_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@pipeline().parameters.input_index_json_name",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY_SSH_KEY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@concat(pipeline().parameters.input_index_json_path,'/ARCHIVE')",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "ssh_key": {
+                      "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@concat(string(split(pipeline().parameters.input_index_json_name,'.')[0]),'_',replace(pipeline().parameters.date_path,'-',''),'.',string(split(pipeline().parameters.input_index_json_name,'.')[1]))",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Get Web port number",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_port_number_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "data insert in sftp_log_filenames",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Iterate on file names",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/utils/delta_sftp_log_filename')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "file_pattern": {
+              "value": "@pipeline().parameters.input_file_pattern",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "filenames_list": {
+              "value": "@join(variables('filenames_list'), ',')",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "log_table_name": {
+              "value": "@pipeline().parameters.log_table_name",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@pipeline().parameters.adb_url",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@pipeline().parameters.adb_cluster_id",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@pipeline().parameters.adb_token_kv",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Get File names from folder",
+        "type": "GetMetadata",
+        "dependsOn": [
+          {
+            "activity": "Get Web port number",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Get Blob Storage account name",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Get Blob Container Name",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get SFTP Hostname",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get SFTP User Name",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_SFTP_FILES_SSH_KEY",
+            "type": "DatasetReference",
+            "parameters": {
+              "FolderPath": {
+                "value": "@pipeline().parameters.input_file_path",
+                "type": "Expression"
+              },
+              "host_name": {
+                "value": "@activity('Web Get SFTP Hostname').output.value",
+                "type": "Expression"
+              },
+              "user_name": {
+                "value": "@activity('Web Get SFTP User Name').output.value",
+                "type": "Expression"
+              },
+              "ssh_key": {
+                "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_ssh_key_kv']",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              },
+              "port_number": {
+                "value": "@activity('Get Web port number').output.value",
+                "type": "Expression"
+              }
+            }
+          },
+          "fieldList": [
+            "childItems"
+          ],
+          "storeSettings": {
+            "type": "SftpReadSettings",
+            "recursive": true,
+            "enablePartitionDiscovery": false,
+            "disableChunking": false
+          },
+          "formatSettings": {
+            "type": "BinaryReadSettings"
+          }
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "data insert in sftp_log_filenames",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Lookup ingestion creds config\",\"error\":\"',activity('Lookup ingestion creds config')?.Error?.message,'\",\"status\":\"',activity('Lookup ingestion creds config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get SFTP User Name\",\"error\":\"',activity('Web Get SFTP User Name')?.Error?.message,'\",\"status\":\"',activity('Web Get SFTP User Name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get SFTP Hostname\",\"error\":\"',activity('Web Get SFTP Hostname')?.Error?.message,'\",\"status\":\"',activity('Web Get SFTP Hostname')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get Blob Container Name\",\"error\":\"',activity('Get Blob Container Name')?.Error?.message,'\",\"status\":\"',activity('Get Blob Container Name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get Blob Storage account name\",\"error\":\"',activity('Get Blob Storage account name')?.Error?.message,'\",\"status\":\"',activity('Get Blob Storage account name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get Web port number\",\"error\":\"',activity('Get Web port number')?.Error?.message,'\",\"status\":\"',activity('Get Web port number')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get File names from folder\",\"error\":\"',activity('Get File names from folder')?.Error?.message,'\",\"status\":\"',activity('Get File names from folder')?.status,'\"}'),\nconcat('{\"activity_name\":\"Case Converter\",\"error\":\"',activity('Case Converter')?.Error?.message,'\",\"status\":\"',activity('Case Converter')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter Filepattern\",\"error\":\"',activity('Filter Filepattern')?.Error?.message,'\",\"status\":\"',activity('Filter Filepattern')?.status,'\"}'),\nconcat('{\"activity_name\":\"If Condition check index json file\",\"error\":\"',activity('If Condition check index json file')?.Error?.message,'\",\"status\":\"',activity('If Condition check index json file')?.status,'\"}'),\nconcat('{\"activity_name\":\"Iterate on file names\",\"error\":\"',activity('Iterate on file names')?.Error?.message,'\",\"status\":\"',activity('Iterate on file names')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-API"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "system_name": {
+        "type": "string"
+      },
+      "input_file_path": {
+        "type": "string"
+      },
+      "input_file_pattern": {
+        "type": "string"
+      },
+      "output_file_path": {
+        "type": "string"
+      },
+      "config_file_path": {
+        "type": "string"
+      },
+      "config_file_name": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "blob_storage_name": {
+        "type": "string"
+      },
+      "blob_container_name": {
+        "type": "string"
+      },
+      "input_index_json_path": {
+        "type": "string"
+      },
+      "input_index_json_name": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "replace_special_values": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "accepted_source_file_ext": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "password_key_name": {
+        "type": "String"
+      },
+      "notebook_output_md5flag": {
+        "type": "String"
+      },
+      "params_lists": {
+        "type": "String"
+      },
+      "error_msg": {
+        "type": "String"
+      },
+      "filenames_list": {
+        "type": "Array"
+      },
+      "filenames_filtered": {
+        "type": "Array"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/SFTP"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:29Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

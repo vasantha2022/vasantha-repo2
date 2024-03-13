@@ -1,0 +1,166 @@
+{
+  "name": "DF_GEN_ADA_ADF_DQ_RULE",
+  "properties": {
+    "description": "DF_GEN_ADA_ADF_DQ_RULE",
+    "folder": {
+      "name": "DF_ADA"
+    },
+    "type": "MappingDataFlow",
+    "typeProperties": {
+      "sources": [
+        {
+          "linkedService": {
+            "referenceName": "LS_ADA_BLOB_STORAGE",
+            "type": "LinkedServiceReference"
+          },
+          "name": "GetSourceData"
+        }
+      ],
+      "sinks": [
+        {
+          "linkedService": {
+            "referenceName": "LS_ADA_BLOB_STORAGE",
+            "type": "LinkedServiceReference"
+          },
+          "name": "StageClean"
+        },
+        {
+          "linkedService": {
+            "referenceName": "LS_ADA_BLOB_STORAGE",
+            "type": "LinkedServiceReference"
+          },
+          "name": "sinkerrorsrecords"
+        },
+        {
+          "linkedService": {
+            "referenceName": "LS_ADA_BLOB_STORAGE",
+            "type": "LinkedServiceReference"
+          },
+          "name": "sinkfilteredrecords"
+        }
+      ],
+      "transformations": [
+        {
+          "name": "RemovederivedColumns"
+        },
+        {
+          "name": "derivedColumndqcondition"
+        },
+        {
+          "name": "derivedColumnfiltercond"
+        },
+        {
+          "name": "filterprocessfiltereddata"
+        },
+        {
+          "name": "filtercleandata"
+        },
+        {
+          "name": "filtererrorrecords"
+        },
+        {
+          "name": "filterrederrorrecords"
+        },
+        {
+          "name": "removeerrorcolumns"
+        }
+      ],
+      "scriptLines": [
+        "parameters{",
+        "     adls_delta_source_path as string ('delta_files/deferredincome/deferredincome_bronze'),",
+        "     adls_delta_clean_target_path as string ('delta_files/deferredincome/deferredincome_test'),",
+        "     adls_container_name as string ('kcom'),",
+        "     merge_schema_flag as boolean (false()),",
+        "     auto_compact as boolean (false()),",
+        "     optimize_write as boolean (false()),",
+        "     dq_expression as string (\"concat(dq_if_value_eq_return_error_reason(byName('valueCode'),'Bandwidth','valueCode Bandwidth filtered'),dq_if_value_eq_return_error_reason(byName('valueCode'),'OLA','valueCode OLA filtered'))\"),",
+        "     filter_expression as string (\"'concat(dq_if_value_eq_return_error_reason(byName('valueCode'),'Bandwidth','valueCode Bandwidth filtered'),dq_if_value_eq_return_error_reason(byName('valueCode'),'OLA','valueCode OLA filtered'))'\"),",
+        "     adls_delta_filter_target_path as string ('delta_files/deferredincome/deferredincome_test_filter'),",
+        "     adls_delta_error_target_path as string ('delta_files/deferredincome/deferredincome_test_error')",
+        "}",
+        "source(allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     ignoreNoFilesFound: false,",
+        "     format: 'delta',",
+        "     fileSystem: ($adls_container_name),",
+        "     folderPath: ($adls_delta_source_path),",
+        "     partitionBy('roundRobin', 5)) ~> GetSourceData",
+        "filtercleandata select(mapColumn(",
+        "          each(match(and(name!='ada_filter_condition',name!='ada_dq_failure_reason')))",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> RemovederivedColumns",
+        "filterprocessfiltereddata derive(ada_dq_failure_reason = expr($dq_expression)) ~> derivedColumndqcondition",
+        "GetSourceData derive(ada_filter_condition = expr($filter_expression)) ~> derivedColumnfiltercond",
+        "derivedColumnfiltercond filter(ada_filter_condition =='') ~> filterprocessfiltereddata",
+        "derivedColumndqcondition filter(ada_dq_failure_reason =='') ~> filtercleandata",
+        "derivedColumndqcondition filter(ada_dq_failure_reason !='') ~> filtererrorrecords",
+        "derivedColumnfiltercond filter(ada_filter_condition !='') ~> filterrederrorrecords",
+        "filtererrorrecords select(mapColumn(",
+        "          each(match(name!='ada_filter_condition'))",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> removeerrorcolumns",
+        "RemovederivedColumns sink(allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     format: 'delta',",
+        "     fileSystem: ($adls_container_name),",
+        "     folderPath: ($adls_delta_clean_target_path),",
+        "     overwrite: true,",
+        "     mergeSchema: ($merge_schema_flag),",
+        "     autoCompact: ($auto_compact),",
+        "     optimizedWrite: ($optimize_write),",
+        "     vacuum: 0,",
+        "     deletable: false,",
+        "     insertable: true,",
+        "     updateable: false,",
+        "     upsertable: false,",
+        "     umask: 0022,",
+        "     preCommands: [],",
+        "     postCommands: [],",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true,",
+        "     saveOrder: 1,",
+        "     partitionBy('roundRobin', 5)) ~> StageClean",
+        "removeerrorcolumns sink(allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     format: 'delta',",
+        "     fileSystem: ($adls_container_name),",
+        "     folderPath: ($adls_delta_error_target_path),",
+        "     overwrite: true,",
+        "     mergeSchema: ($merge_schema_flag),",
+        "     autoCompact: ($auto_compact),",
+        "     optimizedWrite: ($optimize_write),",
+        "     vacuum: 0,",
+        "     deletable: false,",
+        "     insertable: true,",
+        "     updateable: false,",
+        "     upsertable: false,",
+        "     umask: 0022,",
+        "     preCommands: [],",
+        "     postCommands: [],",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> sinkerrorsrecords",
+        "filterrederrorrecords sink(allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     format: 'delta',",
+        "     fileSystem: ($adls_container_name),",
+        "     folderPath: ($adls_delta_filter_target_path),",
+        "     overwrite: true,",
+        "     mergeSchema: ($merge_schema_flag),",
+        "     autoCompact: ($auto_compact),",
+        "     optimizedWrite: ($optimize_write),",
+        "     vacuum: 0,",
+        "     deletable: false,",
+        "     insertable: true,",
+        "     updateable: false,",
+        "     upsertable: false,",
+        "     umask: 0022,",
+        "     preCommands: [],",
+        "     postCommands: [],",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> sinkfilteredrecords"
+      ]
+    }
+  }
+}

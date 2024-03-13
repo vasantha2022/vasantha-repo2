@@ -1,0 +1,194 @@
+{
+  "name": "PL_EXTRACT_COMP_FILES",
+  "properties": {
+    "activities": [
+      {
+        "name": "Extract 7z and zip files",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/ingestion/extract_compressed_files')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "storage_account": {
+              "value": "@pipeline().globalParameters.blob_storage_account_name",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "file_pattern": {
+              "value": "@pipeline().parameters.file_pattern",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "adls_storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "date_path": {
+              "value": "@pipeline().parameters.date_path",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@pipeline().parameters.adb_url",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@pipeline().parameters.adb_cluster_id",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@pipeline().parameters.adb_token_kv",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Extract 7z and zip files",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Extract 7z and zip files\",\"error\":\"',activity('Extract 7z and zip files')?.Error?.message,'\",\"status\":\"',activity('Extract 7z and zip files')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "EXTRACT_COMP_FILES"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "file_pattern": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/EXTRACT_COMP_FILES"
+    },
+    "annotations": []
+  }
+}

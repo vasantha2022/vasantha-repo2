@@ -1,0 +1,1176 @@
+{
+  "name": "PL_GEN_ADA_API_PAGINATION",
+  "properties": {
+    "activities": [
+      {
+        "name": "ForEach filter Query",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "If Condition check filter query",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@variables('QueryFilterVar')",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Lookup Execute SQL Query",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureDatabricksDeltaLakeSource",
+                  "query": {
+                    "value": "@trim(item())",
+                    "type": "Expression"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "SchemaName": "ada",
+                    "TableName": "cust",
+                    "adb_url": {
+                      "value": "@pipeline().parameters.adb_url",
+                      "type": "Expression"
+                    },
+                    "adb_cluster_id": {
+                      "value": "@pipeline().parameters.adb_cluster_id",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Append variable SQL Query results",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Lookup Execute SQL Query",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "QueryFilterArr",
+                "value": {
+                  "value": "@json(string(activity('Lookup Execute SQL Query').output.firstRow))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Append system_error ForEach filter Query",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Append variable SQL Query results",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Lookup Execute SQL Query\",\"error\":\"',activity('Lookup Execute SQL Query')?.Error?.message,'\",\"status\":\"',activity('Lookup Execute SQL Query')?.status,'\"}'),\nconcat('{\"activity_name\":\"Append variable SQL Query results\",\"error\":\"',activity('Append variable SQL Query results')?.Error?.message,'\",\"status\":\"',activity('Append variable SQL Query results')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach target table schema mapping",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach filter Query",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set variable Array",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEach filter Query",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "QueryFilterArray",
+          "value": {
+            "value": "@variables('QueryFilterArr')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Notebook dynamic api url mappings",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set variable Array",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/ingestion/api_dynamic_url_map_json')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "api_base_url": {
+              "value": "@pipeline().parameters.api_base_url",
+              "type": "Expression"
+            },
+            "api_count_url_config": {
+              "value": "@pipeline().parameters.api_count_url_config",
+              "type": "Expression"
+            },
+            "api_url_config": {
+              "value": "@pipeline().parameters.api_url_config",
+              "type": "Expression"
+            },
+            "api_entity_name": {
+              "value": "@pipeline().parameters.api_entity_name",
+              "type": "Expression"
+            },
+            "api_filter_json": {
+              "value": "@string(variables('QueryFilterArray'))",
+              "type": "Expression"
+            },
+            "api_output_property": {
+              "value": "@pipeline().parameters.api_collection_ref_object",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "storage_account_name": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "api_count_property": {
+              "value": "@pipeline().parameters.api_count_object",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@pipeline().parameters.adb_url",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@pipeline().parameters.adb_cluster_id",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@pipeline().parameters.adb_token_kv",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "If Condition check filter query",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(empty(pipeline().parameters.api_filter_string),equals(trim(pipeline().parameters.api_filter_string),''))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Set variable filter query",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "QueryFilterVar",
+                "value": {
+                  "value": "@split(pipeline().parameters.api_filter_string, '~~')",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set Mod",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set Limit",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "Mod",
+          "value": {
+            "value": "@string(mod(int(variables('TotalRecords')),int(variables('NoofRows'))))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Until Total Batches",
+        "type": "Until",
+        "dependsOn": [
+          {
+            "activity": "Total Batches",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@greaterOrEquals(sub(int(variables('BatchPlaceholder')),1),int(variables('TotalBatches')))",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Increment batch",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Set placeholder",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "TempCount",
+                "value": {
+                  "value": "@variables('BatchPlaceholder')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Set placeholder",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "BatchPlaceholder",
+                "value": {
+                  "value": "@string(if(equals(int(variables('TotalBatches')),1),2,add(int(variables('TempCount')),1)))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Max Request Number",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Increment batch",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "MaxReqNumber",
+                "value": {
+                  "value": "@string(if(equals(int(variables('TotalBatches')),sub(int(variables('BatchPlaceholder')),1)), if(equals(int(variables('Mod')),0),div(int(variables('NoofRows')),int(variables('Limit'))),if(equals(mod(int(variables('Mod')), int(variables('Limit'))),0), div(int(variables('Mod')), int(variables('Limit'))),if(equals(div(int(variables('Mod')), int(variables('Limit'))),0),1 , add(div(int(variables('Mod')), int(variables('Limit'))),1)))),div(int(variables('NoofRows')),int(variables('Limit')))))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Increment Initial Value Offset Success",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Execute Pipeline copy API data",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "InitialValueOffset",
+                "value": {
+                  "value": "@string(if(equals(sub(int(variables('TempCount')),1),1),int(variables('NoofRows')), mul(sub(int(variables('TempCount')),1) , int(variables('NoofRows')))))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Set Max Value Offset Success",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Increment Initial Value Offset Success",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "MaxValueOffset",
+                "value": {
+                  "value": "@string(add(int(variables('InitialValueOffset')),int(variables('NoofRows'))))",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Execute Pipeline copy API data",
+              "type": "ExecutePipeline",
+              "dependsOn": [
+                {
+                  "activity": "Max Request Number",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "PL_GEN_ADA_API_COPY_DATA_MASTER",
+                  "type": "PipelineReference"
+                },
+                "waitOnCompletion": true,
+                "parameters": {
+                  "api_type": {
+                    "value": "@pipeline().parameters.api_type",
+                    "type": "Expression"
+                  },
+                  "system_auth": {
+                    "value": "@pipeline().parameters.system_auth",
+                    "type": "Expression"
+                  },
+                  "config_file_name": {
+                    "value": "@pipeline().parameters.config_file_name",
+                    "type": "Expression"
+                  },
+                  "config_file_path": {
+                    "value": "@pipeline().parameters.config_file_path",
+                    "type": "Expression"
+                  },
+                  "api_url": {
+                    "value": "@if(contains(pipeline().parameters.api_type,'-range-' ),replace(activity('Notebook dynamic api url mappings').output.runOutput[0].api_url,'{limit}', pipeline().parameters.fetch_limit),activity('Notebook dynamic api url mappings').output.runOutput[0].api_url)",
+                    "type": "Expression"
+                  },
+                  "dyn_json_mapping": {
+                    "value": "@if(or(empty(pipeline().parameters.json_translator),equals(pipeline().parameters.json_translator,'')),'NA',activity('Notebook dynamic api url mappings').output.runOutput[0][pipeline().parameters.json_translator])",
+                    "type": "Expression"
+                  },
+                  "offset_range": {
+                    "value": "@concat('RANGE:',variables('InitialValueOffset'),':',variables('MaxValueOffset'),':',pipeline().parameters.fetch_limit)",
+                    "type": "Expression"
+                  },
+                  "max_request_number": {
+                    "value": "@variables('MaxReqNumber')",
+                    "type": "Expression"
+                  },
+                  "sink_file_path": {
+                    "value": "@pipeline().parameters.sink_file_path",
+                    "type": "Expression"
+                  },
+                  "sink_file_name": {
+                    "value": "@string(concat(pipeline().parameters.sink_file_name,'_',pipeline().parameters.file_timestamp,'_',if(equals(length(string(sub(int(variables('BatchPlaceholder')),1))),1),concat('0',string(sub(int(variables('BatchPlaceholder')),1))),string(sub(int(variables('BatchPlaceholder')),1))),'_of_',if(equals(length(variables('TotalBatches')),1),concat('0',variables('TotalBatches')),variables('TotalBatches'))))",
+                    "type": "Expression"
+                  },
+                  "absolute_url": {
+                    "value": "@pipeline().parameters.absolute_url",
+                    "type": "Expression"
+                  },
+                  "total_batch_num": {
+                    "value": "@variables('TotalBatches')",
+                    "type": "Expression"
+                  },
+                  "file_type": {
+                    "value": "@pipeline().parameters.file_type",
+                    "type": "Expression"
+                  },
+                  "api_last_batch_only": {
+                    "value": "@pipeline().parameters.api_last_batch_only",
+                    "type": "Expression"
+                  },
+                  "batch_number": {
+                    "value": "@sub(int(variables('BatchPlaceholder')),1)",
+                    "type": "Expression"
+                  },
+                  "dyn_csv_mapping": {
+                    "value": "@if(or(empty(pipeline().parameters.csv_translator),equals(pipeline().parameters.csv_translator,'')),'NA',activity('Notebook dynamic api url mappings').output.runOutput[0][pipeline().parameters.csv_translator])",
+                    "type": "Expression"
+                  },
+                  "log_parent_run_id": {
+                    "value": "@pipeline().parameters.log_parent_run_id",
+                    "type": "Expression"
+                  },
+                  "data_source": {
+                    "value": "@pipeline().parameters.data_source",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Append system_error ForEach API Source",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Set Max Value Offset Success",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Set placeholder\",\"error\":\"',activity('Set placeholder')?.Error?.message,'\",\"status\":\"',activity('Set placeholder')?.status,'\"}'),\nconcat('{\"activity_name\":\"Increment batch\",\"error\":\"',activity('Increment batch')?.Error?.message,'\",\"status\":\"',activity('Increment batch')?.status,'\"}'),\nconcat('{\"activity_name\":\"Max Request Number\",\"error\":\"',activity('Max Request Number')?.Error?.message,'\",\"status\":\"',activity('Max Request Number')?.status,'\"}'),\nconcat('{\"activity_name\":\"Execute Pipeline copy API data\",\"error\":\"',activity('Execute Pipeline copy API data')?.Error?.message,'\",\"status\":\"',activity('Execute Pipeline copy API data')?.status,'\"}'),\nconcat('{\"activity_name\":\"Increment Initial Value Offset Success\",\"error\":\"',activity('Increment Initial Value Offset Success')?.Error?.message,'\",\"status\":\"',activity('Increment Initial Value Offset Success')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set Max Value Offset Success\",\"error\":\"',activity('Set Max Value Offset Success')?.Error?.message,'\",\"status\":\"',activity('Set Max Value Offset Success')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach target table schema mapping_copy1",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach API Source",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for Until Total Batches",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ],
+          "timeout": "7.00:00:00"
+        }
+      },
+      {
+        "name": "Total Batches",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set Mod",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "TotalBatches",
+          "value": {
+            "value": "@string(if(equals(mod(int(variables('TotalRecords')), int(variables('NoofRows'))),0),div(int(variables('TotalRecords')), int(variables('NoofRows'))),if(equals(div(int(variables('TotalRecords')), int(variables('NoofRows'))),0),1 , add(div(int(variables('TotalRecords')), int(variables('NoofRows'))),1))))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Set NoofRows",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set variable intial Max Value offset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "NoofRows",
+          "value": {
+            "value": "@pipeline().parameters.batch_no_of_rows",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Set Limit",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set NoofRows",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "Limit",
+          "value": {
+            "value": "@pipeline().parameters.fetch_limit",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Set variable intial Max Value offset",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "If Condition check total record count",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "MaxValueOffset",
+          "value": {
+            "value": "@pipeline().parameters.batch_no_of_rows",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "If Condition check total record count",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Notebook dynamic api url mappings",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(empty(trim(pipeline().parameters.api_count_object)),equals(trim(pipeline().parameters.api_count_object),''))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Execute Pipeline get record count",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "policy": {
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "PL_GEN_ADA_API_COPY_DATA_MASTER",
+                  "type": "PipelineReference"
+                },
+                "waitOnCompletion": true,
+                "parameters": {
+                  "api_type": {
+                    "value": "@pipeline().parameters.api_type",
+                    "type": "Expression"
+                  },
+                  "system_auth": {
+                    "value": "@pipeline().parameters.system_auth",
+                    "type": "Expression"
+                  },
+                  "config_file_name": {
+                    "value": "@pipeline().parameters.config_file_name",
+                    "type": "Expression"
+                  },
+                  "config_file_path": {
+                    "value": "@pipeline().parameters.config_file_path",
+                    "type": "Expression"
+                  },
+                  "api_url": {
+                    "value": "@activity('Notebook dynamic api url mappings').output.runOutput[0].api_count_url",
+                    "type": "Expression"
+                  },
+                  "dyn_json_mapping": {
+                    "value": "@activity('Notebook dynamic api url mappings').output.runOutput[0].api_count_map_json",
+                    "type": "Expression"
+                  },
+                  "offset_range": "RANGE:0:0:1",
+                  "max_request_number": "1",
+                  "sink_file_path": "api_tmp",
+                  "sink_file_name": {
+                    "value": "@concat(pipeline().RunId)",
+                    "type": "Expression"
+                  },
+                  "absolute_url": {
+                    "value": "@pipeline().parameters.absolute_url",
+                    "type": "Expression"
+                  },
+                  "total_batch_num": "1",
+                  "file_type": "csv",
+                  "api_last_batch_only": {
+                    "value": "no",
+                    "type": "Expression"
+                  },
+                  "batch_number": "1",
+                  "dyn_csv_mapping": {
+                    "value": "@activity('Notebook dynamic api url mappings').output.runOutput[0].api_count_map_json",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Lookup get record count from blob csv",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "Execute Pipeline get record count",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "DelimitedTextSource",
+                  "storeSettings": {
+                    "type": "AzureBlobFSReadSettings",
+                    "recursive": true,
+                    "enablePartitionDiscovery": false
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextReadSettings"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "FileName": {
+                      "value": "@concat(pipeline().RunId,'.csv')",
+                      "type": "Expression"
+                    },
+                    "FolderName": "api_tmp/converted",
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "ContainerName": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Set variable total record count_copy1",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Lookup get record count from blob csv",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "TotalRecords",
+                "value": {
+                  "value": "@activity('Lookup get record count from blob csv').output.firstRow.count",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Delete record count file in blob_copy1",
+              "type": "Delete",
+              "dependsOn": [
+                {
+                  "activity": "Set variable total record count_copy1",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "FileName": {
+                      "value": "@concat(pipeline().RunId,'.csv')",
+                      "type": "Expression"
+                    },
+                    "FolderName": "api_tmp/converted",
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "ContainerName": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "enableLogging": false,
+                "storeSettings": {
+                  "type": "AzureBlobFSReadSettings",
+                  "recursive": true,
+                  "enablePartitionDiscovery": false
+                }
+              }
+            }
+          ],
+          "ifTrueActivities": [
+            {
+              "name": "Set variable total record count as one",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "TotalRecords",
+                "value": {
+                  "value": "1",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Until Total Batches",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"If Condition check filter query\",\"error\":\"',activity('If Condition check filter query')?.Error?.message,'\",\"status\":\"',activity('If Condition check filter query')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable filter query\",\"error\":\"',activity('Set variable filter query')?.Error?.message,'\",\"status\":\"',activity('Set variable filter query')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach filter Query\",\"error\":\"',activity('ForEach filter Query')?.Error?.message,'\",\"status\":\"',activity('ForEach filter Query')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable Array\",\"error\":\"',activity('Set variable Array')?.Error?.message,'\",\"status\":\"',activity('Set variable Array')?.status,'\"}'),\nconcat('{\"activity_name\":\"Notebook dynamic api url mappings\",\"error\":\"',activity('Notebook dynamic api url mappings')?.Error?.message,'\",\"status\":\"',activity('Notebook dynamic api url mappings')?.status,'\"}'),\nconcat('{\"activity_name\":\"If Condition check total record count\",\"error\":\"',activity('If Condition check total record count')?.Error?.message,'\",\"status\":\"',activity('If Condition check total record count')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable total record count as one\",\"error\":\"',activity('Set variable total record count as one')?.Error?.message,'\",\"status\":\"',activity('Set variable total record count as one')?.status,'\"}'),\nconcat('{\"activity_name\":\"Execute Pipeline get record count\",\"error\":\"',activity('Execute Pipeline get record count')?.Error?.message,'\",\"status\":\"',activity('Execute Pipeline get record count')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup get record count from blob csv\",\"error\":\"',activity('Lookup get record count from blob csv')?.Error?.message,'\",\"status\":\"',activity('Lookup get record count from blob csv')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set variable intial Max Value offset\",\"error\":\"',activity('Set variable intial Max Value offset')?.Error?.message,'\",\"status\":\"',activity('Set variable intial Max Value offset')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set NoofRows\",\"error\":\"',activity('Set NoofRows')?.Error?.message,'\",\"status\":\"',activity('Set NoofRows')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set Limit\",\"error\":\"',activity('Set Limit')?.Error?.message,'\",\"status\":\"',activity('Set Limit')?.status,'\"}'),\nconcat('{\"activity_name\":\"Set Mod\",\"error\":\"',activity('Set Mod')?.Error?.message,'\",\"status\":\"',activity('Set Mod')?.status,'\"}'),\nconcat('{\"activity_name\":\"Total Batches\",\"error\":\"',activity('Total Batches')?.Error?.message,'\",\"status\":\"',activity('Total Batches')?.status,'\"}'),\nconcat('{\"activity_name\":\"Until Total Batches\",\"error\":\"',activity('Until Total Batches')?.Error?.message,'\",\"status\":\"',activity('Until Total Batches')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-API"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "api_type": {
+        "type": "string"
+      },
+      "system_auth": {
+        "type": "string"
+      },
+      "config_file_name": {
+        "type": "string",
+        "defaultValue": ".json"
+      },
+      "config_file_path": {
+        "type": "string"
+      },
+      "api_url_config": {
+        "type": "string"
+      },
+      "api_count_url_config": {
+        "type": "string"
+      },
+      "api_base_url": {
+        "type": "string"
+      },
+      "api_entity_name": {
+        "type": "string"
+      },
+      "api_filter_string": {
+        "type": "string"
+      },
+      "api_collection_ref_object": {
+        "type": "string"
+      },
+      "api_count_object": {
+        "type": "string"
+      },
+      "absolute_url": {
+        "type": "string"
+      },
+      "batch_no_of_rows": {
+        "type": "string"
+      },
+      "fetch_limit": {
+        "type": "string"
+      },
+      "sink_file_path": {
+        "type": "string"
+      },
+      "sink_file_name": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "api_last_batch_only": {
+        "type": "string"
+      },
+      "file_type": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "file_timestamp": {
+        "type": "string"
+      },
+      "json_translator": {
+        "type": "string"
+      },
+      "csv_translator": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "QueryFilterArr": {
+        "type": "Array"
+      },
+      "QueryFilterArray": {
+        "type": "Array"
+      },
+      "QueryFilterVar": {
+        "type": "Array"
+      },
+      "TotalRecords": {
+        "type": "String"
+      },
+      "Mod": {
+        "type": "String"
+      },
+      "BatchPlaceholder": {
+        "type": "String",
+        "defaultValue": "1"
+      },
+      "MaxReqNumber": {
+        "type": "String"
+      },
+      "TotalBatches": {
+        "type": "String"
+      },
+      "TempCount": {
+        "type": "String",
+        "defaultValue": "1"
+      },
+      "InitialValueOffset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "MaxValueOffset": {
+        "type": "String"
+      },
+      "IncrementValueOffset": {
+        "type": "String"
+      },
+      "NoofRows": {
+        "type": "String",
+        "defaultValue": "100000"
+      },
+      "Limit": {
+        "type": "String",
+        "defaultValue": "2500"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/API"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:30Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

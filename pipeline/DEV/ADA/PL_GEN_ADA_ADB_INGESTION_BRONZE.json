@@ -1,0 +1,354 @@
+{
+  "name": "PL_GEN_ADA_ADB_INGESTION_BRONZE",
+  "properties": {
+    "activities": [
+      {
+        "name": "Bronze Table Ingestion",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Filter Active flag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/ingestion/delta_ingestion_pyspark')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "file_pattern": {
+              "value": "@toLower(pipeline().parameters.file_pattern)",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@toLower(pipeline().parameters.source_type)",
+              "type": "Expression"
+            },
+            "date_path": {
+              "value": "@pipeline().parameters.date_path",
+              "type": "Expression"
+            },
+            "schema_name": {
+              "value": "@activity('Read master config').output.value[0].delta_table_details['schema']",
+              "type": "Expression"
+            },
+            "sheet_name": {
+              "value": "@pipeline().parameters.sheet_name",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_table_name": {
+              "value": "@pipeline().parameters.log_table_name",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@pipeline().parameters.adb_url",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@pipeline().parameters.adb_cluster_id",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@pipeline().parameters.adb_token_kv",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Lookup Pre-ingestion Metadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@activity('Read master config').output.value[0].folder_path.fp_metadata",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_pre_ingestion)",
+                "type": "Expression"
+              },
+              "metadata_sheet": {
+                "value": "@toUpper(pipeline().parameters.source_type)",
+                "type": "Expression"
+              },
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Filter Active flag",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "Lookup Pre-ingestion Metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup Pre-ingestion Metadata').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@and(equals(item().active_flag,'1'),if(equals(toUpper(pipeline().parameters.source_type),'SFTP'),equals(toLower(item().data_source),pipeline().parameters.data_source),if(equals(toUpper(pipeline().parameters.source_type),'API'),equals(toLower(item().data_source),pipeline().parameters.data_source),equals(toLower(item().input_table_view_name),pipeline().parameters.file_pattern))))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Bronze Table Ingestion",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup Pre-ingestion Metadata\",\"error\":\"',activity('Lookup Pre-ingestion Metadata')?.Error?.message,'\",\"status\":\"',activity('Lookup Pre-ingestion Metadata')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter Active flag\",\"error\":\"',activity('Filter Active flag')?.Error?.message,'\",\"status\":\"',activity('Filter Active flag')?.status,'\"}'),\nconcat('{\"activity_name\":\"Bronze Table Ingestion\",\"error\":\"',activity('Bronze Table Ingestion')?.Error?.message,'\",\"status\":\"',activity('Bronze Table Ingestion')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-ADB"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "tenant_id": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "file_pattern": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "sheet_name": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/ADB"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:29Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

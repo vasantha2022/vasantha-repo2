@@ -1,0 +1,486 @@
+{
+  "name": "PL_GEN_ADA_INGESTION_API_MASTER",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup API Metadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@activity('Read master config').output.value[0].folder_path.fp_metadata",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_pre_ingestion)",
+                "type": "Expression"
+              },
+              "metadata_sheet": {
+                "value": "@toUpper(pipeline().parameters.source_type)",
+                "type": "Expression"
+              },
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Filter Active_flag",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "Lookup API Metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup API Metadata').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@and(equals(item().active_flag,'1'),equals(toLower(item().data_source),toLower(pipeline().parameters.filter_table_name)))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "ForEach API Source",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Filter Active_flag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Filter Active_flag').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Execute Pipeline API pagination",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "policy": {
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "PL_GEN_ADA_API_PAGINATION",
+                  "type": "PipelineReference"
+                },
+                "waitOnCompletion": true,
+                "parameters": {
+                  "api_type": {
+                    "value": "@item().api_type",
+                    "type": "Expression"
+                  },
+                  "system_auth": {
+                    "value": "@item().system_name",
+                    "type": "Expression"
+                  },
+                  "config_file_name": {
+                    "value": "@concat(pipeline().parameters.tenant_id,activity('Read master config').output.value[0].file_meta.suffix_ingestion_credentials)",
+                    "type": "Expression"
+                  },
+                  "config_file_path": {
+                    "value": "@activity('Read master config').output.value[0].folder_path.fp_config",
+                    "type": "Expression"
+                  },
+                  "api_url_config": {
+                    "value": "@item().api_url_config",
+                    "type": "Expression"
+                  },
+                  "api_count_url_config": {
+                    "value": "@item().api_count_url_config",
+                    "type": "Expression"
+                  },
+                  "api_base_url": {
+                    "value": "@item().api_base_url",
+                    "type": "Expression"
+                  },
+                  "api_entity_name": {
+                    "value": "@item().api_entity_name",
+                    "type": "Expression"
+                  },
+                  "api_filter_string": {
+                    "value": "@item().api_query_filter",
+                    "type": "Expression"
+                  },
+                  "api_collection_ref_object": {
+                    "value": "@item().api_collection_ref_object",
+                    "type": "Expression"
+                  },
+                  "api_count_object": {
+                    "value": "@item().api_count_object",
+                    "type": "Expression"
+                  },
+                  "absolute_url": {
+                    "value": "@item().absolute_url",
+                    "type": "Expression"
+                  },
+                  "batch_no_of_rows": {
+                    "value": "@if(or(empty(trim(item().batch_no_of_rows)),equals(trim(item().batch_no_of_rows), '')),'10',trim(item().batch_no_of_rows))",
+                    "type": "Expression"
+                  },
+                  "fetch_limit": {
+                    "value": "@if(or(empty(trim(item().fetch_limit)),equals(trim(item().fetch_limit), '')),'5',trim(item().fetch_limit))",
+                    "type": "Expression"
+                  },
+                  "sink_file_path": {
+                    "value": "@concat('landing_zone/',toLower(pipeline().parameters.source_type),'/',pipeline().parameters.data_source,'/',pipeline().parameters.date_path)",
+                    "type": "Expression"
+                  },
+                  "sink_file_name": {
+                    "value": "@pipeline().parameters.file_pattern",
+                    "type": "Expression"
+                  },
+                  "tenant_id": {
+                    "value": "@pipeline().parameters.tenant_id",
+                    "type": "Expression"
+                  },
+                  "api_last_batch_only": {
+                    "value": "@item().api_last_batch_only",
+                    "type": "Expression"
+                  },
+                  "file_type": {
+                    "value": "@item().file_type",
+                    "type": "Expression"
+                  },
+                  "data_source": {
+                    "value": "@pipeline().parameters.data_source",
+                    "type": "Expression"
+                  },
+                  "file_timestamp": {
+                    "value": "@variables('Timestamp')",
+                    "type": "Expression"
+                  },
+                  "json_translator": {
+                    "value": "@item().json_translator",
+                    "type": "Expression"
+                  },
+                  "csv_translator": {
+                    "value": "@item().csv_translator",
+                    "type": "Expression"
+                  },
+                  "adb_url": {
+                    "value": "@pipeline().parameters.adb_url",
+                    "type": "Expression"
+                  },
+                  "adb_cluster_id": {
+                    "value": "@pipeline().parameters.adb_cluster_id",
+                    "type": "Expression"
+                  },
+                  "adb_token_kv": {
+                    "value": "@pipeline().parameters.adb_token_kv",
+                    "type": "Expression"
+                  },
+                  "adb_repo_url": {
+                    "value": "@pipeline().parameters.adb_repo_url",
+                    "type": "Expression"
+                  },
+                  "log_parent_run_id": {
+                    "value": "@pipeline().parameters.log_parent_run_id",
+                    "type": "Expression"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Append system_error ForEach API Source",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Execute Pipeline API pagination",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Execute Pipeline API pagination\",\"error\":\"',activity('Execute Pipeline API pagination')?.Error?.message,'\",\"status\":\"',activity('Execute Pipeline API pagination')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach API Source",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach API Source",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Set timestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Set timestamp",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "Timestamp",
+          "value": {
+            "value": "@string(utcnow('yyyyMMddHHmmss'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEach API Source",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Set timestamp\",\"error\":\"',activity('Set timestamp')?.Error?.message,'\",\"status\":\"',activity('Set timestamp')?.status,'\"}'),\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup API Metadata\",\"error\":\"',activity('Lookup API Metadata')?.Error?.message,'\",\"status\":\"',activity('Lookup API Metadata')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter Active_flag\",\"error\":\"',activity('Filter Active_flag')?.Error?.message,'\",\"status\":\"',activity('Filter Active_flag')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach API Source\",\"error\":\"',activity('ForEach API Source')?.Error?.message,'\",\"status\":\"',activity('ForEach API Source')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-API"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "entity_name": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "file_pattern": {
+        "type": "string"
+      },
+      "filter_table_name": {
+        "type": "string"
+      },
+      "date_path": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "InitialOffsetValue": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "NoofBatches": {
+        "type": "String"
+      },
+      "TotalRecords": {
+        "type": "String"
+      },
+      "Timestamp": {
+        "type": "String"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/API"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:31Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

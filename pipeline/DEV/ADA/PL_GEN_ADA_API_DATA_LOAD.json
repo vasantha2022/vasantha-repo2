@@ -1,0 +1,416 @@
+{
+  "name": "PL_GEN_ADA_API_DATA_LOAD",
+  "properties": {
+    "activities": [
+      {
+        "name": "Check json file type",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@contains(pipeline().parameters.file_type,'json')",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Copy data from API to ADLS JSON",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "RestSource",
+                  "httpRequestTimeout": "00:01:40",
+                  "requestInterval": "00.00:00:00.010",
+                  "requestMethod": "GET",
+                  "additionalHeaders": {
+                    "x-api-key": {
+                      "value": "@pipeline().parameters.x_api_key",
+                      "type": "Expression"
+                    }
+                  },
+                  "paginationRules": {
+                    "QueryParameters.{offset}": {
+                      "value": "@pipeline().parameters.offset_range",
+                      "type": "Expression"
+                    },
+                    "MaxRequestNumber": {
+                      "value": "@pipeline().parameters.max_request_number",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "sink": {
+                  "type": "JsonSink",
+                  "storeSettings": {
+                    "type": "AzureBlobFSWriteSettings"
+                  },
+                  "formatSettings": {
+                    "type": "JsonWriteSettings"
+                  }
+                },
+                "enableStaging": false,
+                "translator": {
+                  "value": "@json(pipeline().parameters.dyn_json_mapping).translator",
+                  "type": "Expression"
+                }
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_REST_API_OAUTH_CLENT_CRED",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "api_url": {
+                      "value": "@pipeline().parameters.api_url",
+                      "type": "Expression"
+                    },
+                    "api_token_endpoint": {
+                      "value": "@pipeline().parameters.api_token_endpoint",
+                      "type": "Expression"
+                    },
+                    "api_client_id": {
+                      "value": "@pipeline().parameters.api_client_id",
+                      "type": "Expression"
+                    },
+                    "api_client_secret_kv_name": {
+                      "value": "@pipeline().parameters.api_client_secret_kv_name",
+                      "type": "Expression"
+                    },
+                    "api_scope": {
+                      "value": "@pipeline().parameters.api_scope",
+                      "type": "Expression"
+                    },
+                    "api_resource": {
+                      "value": "@pipeline().parameters.api_resource",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_ADLS_JSON",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "file_path": {
+                      "value": "@pipeline().parameters.sink_file_path",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@concat(pipeline().parameters.sink_file_name,'.json')",
+                      "type": "Expression"
+                    },
+                    "container_name": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    },
+                    "stroage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Check csv file type",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Check json file type",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(contains(pipeline().parameters.file_type,'csv'),and(equals(pipeline().parameters.api_last_batch_only,'yes'),equals(pipeline().parameters.total_batch_num,pipeline().parameters.batch_number)))",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Copy data from API to ADLS CSV",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "RestSource",
+                  "httpRequestTimeout": "00:01:40",
+                  "requestInterval": "00.00:00:00.010",
+                  "requestMethod": "GET",
+                  "additionalHeaders": {
+                    "x-api-key": {
+                      "value": "@pipeline().parameters.x_api_key",
+                      "type": "Expression"
+                    }
+                  },
+                  "paginationRules": {
+                    "QueryParameters.{offset}": {
+                      "value": "@pipeline().parameters.offset_range",
+                      "type": "Expression"
+                    },
+                    "MaxRequestNumber": {
+                      "value": "@pipeline().parameters.max_request_number",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "sink": {
+                  "type": "DelimitedTextSink",
+                  "storeSettings": {
+                    "type": "AzureBlobFSWriteSettings"
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextWriteSettings",
+                    "quoteAllText": true,
+                    "fileExtension": ".txt"
+                  }
+                },
+                "enableStaging": false,
+                "translator": {
+                  "value": "@json(pipeline().parameters.dyn_csv_mapping).translator",
+                  "type": "Expression"
+                }
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_REST_API_OAUTH_CLENT_CRED",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "api_url": {
+                      "value": "@pipeline().parameters.api_url",
+                      "type": "Expression"
+                    },
+                    "api_token_endpoint": {
+                      "value": "@pipeline().parameters.api_token_endpoint",
+                      "type": "Expression"
+                    },
+                    "api_client_id": {
+                      "value": "@pipeline().parameters.api_client_id",
+                      "type": "Expression"
+                    },
+                    "api_client_secret_kv_name": {
+                      "value": "@pipeline().parameters.api_client_secret_kv_name",
+                      "type": "Expression"
+                    },
+                    "api_scope": {
+                      "value": "@pipeline().parameters.api_scope",
+                      "type": "Expression"
+                    },
+                    "api_resource": {
+                      "value": "@pipeline().parameters.api_resource",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "FileName": {
+                      "value": "@concat(pipeline().parameters.sink_file_name,'.csv')",
+                      "type": "Expression"
+                    },
+                    "FolderName": {
+                      "value": "@concat(pipeline().parameters.sink_file_path,'/converted')",
+                      "type": "Expression"
+                    },
+                    "storage_name": {
+                      "value": "@pipeline().globalParameters.storage_account_name",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "ContainerName": {
+                      "value": "@pipeline().globalParameters.container_name",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Check csv file type",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Check json file type\",\"error\":\"',activity('Check json file type')?.Error?.message,'\",\"status\":\"',activity('Check json file type')?.status,'\"}'),\nconcat('{\"activity_name\":\"Copy data from API to ADLS JSON\",\"error\":\"',activity('Copy data from API to ADLS JSON')?.Error?.message,'\",\"status\":\"',activity('Copy data from API to ADLS JSON')?.status,'\"}'),\nconcat('{\"activity_name\":\"Check csv file type\",\"error\":\"',activity('Check csv file type')?.Error?.message,'\",\"status\":\"',activity('Check csv file type')?.status,'\"}'),\nconcat('{\"activity_name\":\"Copy data from API to ADLS CSV\",\"error\":\"',activity('Copy data from API to ADLS CSV')?.Error?.message,'\",\"status\":\"',activity('Copy data from API to ADLS CSV')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-API"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "api_type": {
+        "type": "string"
+      },
+      "system_auth": {
+        "type": "string"
+      },
+      "config_file_name": {
+        "type": "string"
+      },
+      "config_file_path": {
+        "type": "string"
+      },
+      "api_url": {
+        "type": "string"
+      },
+      "dyn_json_mapping": {
+        "type": "string"
+      },
+      "offset_range": {
+        "type": "string"
+      },
+      "max_request_number": {
+        "type": "string"
+      },
+      "sink_file_path": {
+        "type": "string"
+      },
+      "sink_file_name": {
+        "type": "string"
+      },
+      "absolute_url": {
+        "type": "string"
+      },
+      "file_type": {
+        "type": "string"
+      },
+      "api_last_batch_only": {
+        "type": "string"
+      },
+      "batch_number": {
+        "type": "string"
+      },
+      "total_batch_num": {
+        "type": "string"
+      },
+      "api_token_endpoint": {
+        "type": "string"
+      },
+      "api_client_id": {
+        "type": "string"
+      },
+      "api_client_secret_kv_name": {
+        "type": "string"
+      },
+      "api_scope": {
+        "type": "string"
+      },
+      "api_resource": {
+        "type": "string"
+      },
+      "x_api_key": {
+        "type": "string"
+      },
+      "dyn_csv_mapping": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/API"
+    },
+    "annotations": []
+  }
+}

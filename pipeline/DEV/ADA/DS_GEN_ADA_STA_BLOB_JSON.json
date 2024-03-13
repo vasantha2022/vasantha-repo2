@@ -1,0 +1,59 @@
+{
+  "name": "DS_GEN_ADA_STA_BLOB_JSON",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_ADA_STA_BLOB_STORAGE",
+      "type": "LinkedServiceReference",
+      "parameters": {
+        "storage_name": {
+          "value": "@dataset().storage_name",
+          "type": "Expression"
+        },
+        "kv_name": {
+          "value": "@dataset().kv_name",
+          "type": "Expression"
+        }
+      }
+    },
+    "parameters": {
+      "storage_name": {
+        "type": "string"
+      },
+      "container_name": {
+        "type": "string"
+      },
+      "kv_name": {
+        "type": "string"
+      },
+      "file_name": {
+        "type": "string"
+      },
+      "folder_path": {
+        "type": "string"
+      }
+    },
+    "folder": {
+      "name": "DS_ADA"
+    },
+    "annotations": [],
+    "type": "Json",
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobStorageLocation",
+        "fileName": {
+          "value": "@dataset().file_name",
+          "type": "Expression"
+        },
+        "folderPath": {
+          "value": "@dataset().folder_path",
+          "type": "Expression"
+        },
+        "container": {
+          "value": "@dataset().container_name",
+          "type": "Expression"
+        }
+      }
+    },
+    "schema": {}
+  }
+}

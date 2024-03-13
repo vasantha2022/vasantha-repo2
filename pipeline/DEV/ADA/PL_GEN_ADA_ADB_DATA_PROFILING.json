@@ -1,0 +1,357 @@
+{
+  "name": "PL_GEN_ADA_ADB_DATA_PROFILING",
+  "properties": {
+    "activities": [
+      {
+        "name": "Data Profiling Notebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Web Get ADB Url",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get ADB Repo Url",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get ADB ClusterId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(activity('Web Get ADB Repo Url').output.value,'ada_workflow/utils/data_profiling')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "file_pattern": {
+              "value": "@toLower(pipeline().parameters.file_pattern)",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "stage": {
+              "value": "@toLower(pipeline().parameters.stage)",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@toLower(pipeline().parameters.source_type)",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Web Get ADB Url",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_url_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Web Get ADB Repo Url",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_repo_url_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Web Get ADB ClusterId",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_clusterid_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Data Profiling Email Alert",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Data Profiling Notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(activity('Web Get ADB Repo Url').output.value,'ada_workflow/utils/data_profiling_email_alert')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "file_pattern": {
+              "value": "@toLower(pipeline().parameters.file_pattern)",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "storage_account": {
+              "value": "@pipeline().globalParameters.storage_account_name",
+              "type": "Expression"
+            },
+            "container_name": {
+              "value": "@pipeline().globalParameters.container_name",
+              "type": "Expression"
+            },
+            "master_config_file": {
+              "value": "@pipeline().globalParameters.config_master",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "source_type": {
+              "value": "@toLower(pipeline().parameters.source_type)",
+              "type": "Expression"
+            },
+            "stage": {
+              "value": "@toLower(pipeline().parameters.stage)",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+              "type": "Expression"
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "file_pattern": {
+        "type": "string",
+        "defaultValue": "MARKETPLACE"
+      },
+      "tenant_id": {
+        "type": "string",
+        "defaultValue": "marketplace"
+      },
+      "log_parent_run_id": {
+        "type": "string",
+        "defaultValue": "11"
+      },
+      "stage": {
+        "type": "string",
+        "defaultValue": "bronze"
+      },
+      "source_type": {
+        "type": "string",
+        "defaultValue": "sftp"
+      }
+    },
+    "folder": {
+      "name": "ADA/DATA_PROFILING"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:29Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

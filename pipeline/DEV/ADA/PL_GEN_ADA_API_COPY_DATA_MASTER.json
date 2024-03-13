@@ -1,0 +1,962 @@
+{
+  "name": "PL_GEN_ADA_API_COPY_DATA_MASTER",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup ingestion creds config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@pipeline().parameters.config_file_path",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@pipeline().parameters.config_file_name",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Switch API copy data",
+        "type": "Switch",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "on": {
+            "value": "@pipeline().parameters.api_type",
+            "type": "Expression"
+          },
+          "cases": [
+            {
+              "value": "oauth2-range-client-cred",
+              "activities": [
+                {
+                  "name": "Web Get api token end point",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_token_endpoint'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api client id",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_client_id'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api x api key",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api-x-api-key'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api scope",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_scope'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api resource",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_resource'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Execute API Data Load",
+                  "type": "ExecutePipeline",
+                  "dependsOn": [
+                    {
+                      "activity": "Web Get api token end point",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api client id",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api x api key",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api scope",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api resource",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "pipeline": {
+                      "referenceName": "PL_GEN_ADA_API_DATA_LOAD",
+                      "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                      "api_type": {
+                        "value": "@pipeline().parameters.api_type",
+                        "type": "Expression"
+                      },
+                      "system_auth": {
+                        "value": "@pipeline().parameters.system_auth",
+                        "type": "Expression"
+                      },
+                      "config_file_name": {
+                        "value": "@pipeline().parameters.config_file_name",
+                        "type": "Expression"
+                      },
+                      "config_file_path": {
+                        "value": "@pipeline().parameters.config_file_path",
+                        "type": "Expression"
+                      },
+                      "api_url": {
+                        "value": "@pipeline().parameters.api_url",
+                        "type": "Expression"
+                      },
+                      "dyn_json_mapping": {
+                        "value": "@pipeline().parameters.dyn_json_mapping",
+                        "type": "Expression"
+                      },
+                      "offset_range": {
+                        "value": "@pipeline().parameters.offset_range",
+                        "type": "Expression"
+                      },
+                      "max_request_number": {
+                        "value": "@pipeline().parameters.max_request_number",
+                        "type": "Expression"
+                      },
+                      "sink_file_path": {
+                        "value": "@pipeline().parameters.sink_file_path",
+                        "type": "Expression"
+                      },
+                      "sink_file_name": {
+                        "value": "@pipeline().parameters.sink_file_name",
+                        "type": "Expression"
+                      },
+                      "absolute_url": {
+                        "value": "@pipeline().parameters.absolute_url",
+                        "type": "Expression"
+                      },
+                      "file_type": {
+                        "value": "@pipeline().parameters.file_type",
+                        "type": "Expression"
+                      },
+                      "api_last_batch_only": {
+                        "value": "@pipeline().parameters.api_last_batch_only",
+                        "type": "Expression"
+                      },
+                      "batch_number": {
+                        "value": "@pipeline().parameters.batch_number",
+                        "type": "Expression"
+                      },
+                      "total_batch_num": {
+                        "value": "@pipeline().parameters.total_batch_num",
+                        "type": "Expression"
+                      },
+                      "api_token_endpoint": {
+                        "value": "@activity('Web Get api token end point').output.value",
+                        "type": "Expression"
+                      },
+                      "api_client_id": {
+                        "value": "@activity('Web Get api client id').output.value",
+                        "type": "Expression"
+                      },
+                      "api_client_secret_kv_name": {
+                        "value": "@activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_client_secret']",
+                        "type": "Expression"
+                      },
+                      "api_scope": {
+                        "value": "@if(or(empty(activity('Web Get api scope').output.value),equals(toUpper(activity('Web Get api scope').output.value),'NA')), null,activity('Web Get api scope').output.value)",
+                        "type": "Expression"
+                      },
+                      "api_resource": {
+                        "value": "@activity('Web Get api resource').output.value",
+                        "type": "Expression"
+                      },
+                      "x_api_key": {
+                        "value": "@activity('Web Get api x api key').output.value",
+                        "type": "Expression"
+                      },
+                      "dyn_csv_mapping": {
+                        "value": "@pipeline().parameters.dyn_csv_mapping",
+                        "type": "Expression"
+                      },
+                      "log_parent_run_id": {
+                        "value": "@pipeline().parameters.log_parent_run_id",
+                        "type": "Expression"
+                      },
+                      "data_source": {
+                        "value": "@pipeline().parameters.data_source",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "Append system_error Switch oauth2rangeclientcred",
+                  "type": "AppendVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Execute API Data Load",
+                      "dependencyConditions": [
+                        "Skipped",
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "system_error",
+                    "value": {
+                      "value": "@join(createArray(\nconcat('{\"activity_name\":\"Web Get api token end point\",\"error\":\"',activity('Web Get api token end point')?.Error?.message,'\",\"status\":\"',activity('Web Get api token end point')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api client id\",\"error\":\"',activity('Web Get api client id')?.Error?.message,'\",\"status\":\"',activity('Web Get api client id')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api x api key\",\"error\":\"',activity('Web Get api x api key')?.Error?.message,'\",\"status\":\"',activity('Web Get api x api key')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api scope\",\"error\":\"',activity('Web Get api scope')?.Error?.message,'\",\"status\":\"',activity('Web Get api scope')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api resource\",\"error\":\"',activity('Web Get api resource')?.Error?.message,'\",\"status\":\"',activity('Web Get api resource')?.status,'\"}'),\nconcat('{\"activity_name\":\"Execute API Data Load\",\"error\":\"',activity('Execute API Data Load')?.Error?.message,'\",\"status\":\"',activity('Execute API Data Load')?.status,'\"}')\n),',')",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Fail Switch oauth2rangeclientcred",
+                  "type": "Fail",
+                  "dependsOn": [
+                    {
+                      "activity": "Append system_error Switch oauth2rangeclientcred",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "message": "Explicit Fail for Switch Case",
+                    "errorCode": "00000"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "oauth2-range-refresh-token",
+              "activities": [
+                {
+                  "name": "Copy data from API to ADLS oauth refresh token",
+                  "type": "Copy",
+                  "dependsOn": [
+                    {
+                      "activity": "Web Get access token",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "RestSource",
+                      "httpRequestTimeout": "00:01:40",
+                      "requestInterval": "00.00:00:00.010",
+                      "requestMethod": "GET",
+                      "additionalHeaders": {
+                        "Authorization": {
+                          "value": "@concat('Bearer ',activity('Web Get access token').output.access_token)",
+                          "type": "Expression"
+                        }
+                      },
+                      "paginationRules": {
+                        "QueryParameters.{offset}": {
+                          "value": "@pipeline().parameters.offset_range",
+                          "type": "Expression"
+                        },
+                        "MaxRequestNumber": {
+                          "value": "@pipeline().parameters.max_request_number",
+                          "type": "Expression"
+                        }
+                      }
+                    },
+                    "sink": {
+                      "type": "DelimitedTextSink",
+                      "storeSettings": {
+                        "type": "AzureBlobFSWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "DelimitedTextWriteSettings",
+                        "quoteAllText": true,
+                        "fileExtension": ".txt"
+                      }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                      "value": "@json(pipeline().parameters.dyn_json_mapping).translator",
+                      "type": "Expression"
+                    }
+                  },
+                  "inputs": [
+                    {
+                      "referenceName": "DS_GEN_ADA_REST_API_ANONYMOUS",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "api_url": {
+                          "value": "@pipeline().parameters.api_url",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "FileName": {
+                          "value": "@pipeline().parameters.sink_file_name",
+                          "type": "Expression"
+                        },
+                        "FolderName": {
+                          "value": "@pipeline().parameters.sink_file_path",
+                          "type": "Expression"
+                        },
+                        "storage_name": {
+                          "value": "@pipeline().globalParameters.storage_account_name",
+                          "type": "Expression"
+                        },
+                        "kv_name": {
+                          "value": "@pipeline().globalParameters.keyvault_name",
+                          "type": "Expression"
+                        },
+                        "ContainerName": {
+                          "value": "@pipeline().globalParameters.container_name",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Web Get api token end point refresh token",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_token_endpoint'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api client id refresh token",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_client_id'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api refresh token",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api-x-api-key'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get api client secret refresh token",
+                  "type": "WebActivity",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "GET",
+                    "url": {
+                      "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].API[pipeline().parameters.system_auth]['api_scope'],'?api-version=7.0')",
+                      "type": "Expression"
+                    },
+                    "authentication": {
+                      "type": "MSI",
+                      "resource": "https://vault.azure.net"
+                    }
+                  }
+                },
+                {
+                  "name": "Web Get access token",
+                  "type": "WebActivity",
+                  "dependsOn": [
+                    {
+                      "activity": "Web Get api token end point refresh token",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api client id refresh token",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api refresh token",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    },
+                    {
+                      "activity": "Web Get api client secret refresh token",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "method": "POST",
+                    "headers": {
+                      "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    "url": {
+                      "value": "@activity('Web Get api token end point refresh token').output",
+                      "type": "Expression"
+                    },
+                    "body": {
+                      "value": "@concat('grant_type=refresh_token&client_id=',activity('Web Get api client id refresh token').output.value,'&client_secret=',activity('Web Get api client secret refresh token').output.value,'&refresh_token=',activity('Web Get api refresh token').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Append system_error Switch oauth2rangerefreshtoken",
+                  "type": "AppendVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Copy data from API to ADLS oauth refresh token",
+                      "dependencyConditions": [
+                        "Skipped",
+                        "Failed"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "system_error",
+                    "value": {
+                      "value": "@join(createArray(\nconcat('{\"activity_name\":\"Web Get api token end point refresh token\",\"error\":\"',activity('Web Get api token end point refresh token')?.Error?.message,'\",\"status\":\"',activity('Web Get api token end point refresh token')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api client id refresh token\",\"error\":\"',activity('Web Get api client id refresh token')?.Error?.message,'\",\"status\":\"',activity('Web Get api client id refresh token')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api refresh token\",\"error\":\"',activity('Web Get api refresh token')?.Error?.message,'\",\"status\":\"',activity('Web Get api refresh token')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get api client secret refresh token\",\"error\":\"',activity('Web Get api client secret refresh token')?.Error?.message,'\",\"status\":\"',activity('Web Get api client secret refresh token')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get access token\",\"error\":\"',activity('Web Get access token')?.Error?.message,'\",\"status\":\"',activity('Web Get access token')?.status,'\"}'),\nconcat('{\"activity_name\":\"Copy data from API to ADLS oauth refresh token\",\"error\":\"',activity('Copy data from API to ADLS oauth refresh token')?.Error?.message,'\",\"status\":\"',activity('Copy data from API to ADLS oauth refresh token')?.status,'\"}')\n),',')",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Fail Switch oauth2rangerefreshtoken",
+                  "type": "Fail",
+                  "dependsOn": [
+                    {
+                      "activity": "Append system_error Switch oauth2rangerefreshtoken",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "message": "Explicit Fail for Switch Case",
+                    "errorCode": "00000"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "oauth2-absurl-anonymous",
+              "activities": [
+                {
+                  "name": "Copy data from API to ADLS oauth anonymous",
+                  "type": "Copy",
+                  "dependsOn": [],
+                  "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                  },
+                  "userProperties": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "RestSource",
+                      "httpRequestTimeout": "00:01:40",
+                      "requestInterval": "00.00:00:00.010",
+                      "requestMethod": "GET",
+                      "paginationRules": {
+                        "AbsoluteUrl": {
+                          "value": "@pipeline().parameters.absolute_url",
+                          "type": "Expression"
+                        }
+                      }
+                    },
+                    "sink": {
+                      "type": "DelimitedTextSink",
+                      "storeSettings": {
+                        "type": "AzureBlobFSWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "DelimitedTextWriteSettings",
+                        "quoteAllText": true,
+                        "fileExtension": ".txt"
+                      }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                      "value": "@json(string(pipeline().parameters.dyn_json_mapping)).translator",
+                      "type": "Expression"
+                    }
+                  },
+                  "inputs": [
+                    {
+                      "referenceName": "DS_GEN_ADA_REST_API_ANONYMOUS",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "api_url": {
+                          "value": "@pipeline().parameters.api_url",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "FileName": {
+                          "value": "@pipeline().parameters.sink_file_name",
+                          "type": "Expression"
+                        },
+                        "FolderName": {
+                          "value": "@pipeline().parameters.sink_file_path",
+                          "type": "Expression"
+                        },
+                        "storage_name": {
+                          "value": "@pipeline().globalParameters.storage_account_name",
+                          "type": "Expression"
+                        },
+                        "kv_name": {
+                          "value": "@pipeline().globalParameters.keyvault_name",
+                          "type": "Expression"
+                        },
+                        "ContainerName": {
+                          "value": "@pipeline().globalParameters.container_name",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Append system_error Switch oauth2absurlanonymous",
+                  "type": "AppendVariable",
+                  "dependsOn": [
+                    {
+                      "activity": "Copy data from API to ADLS oauth anonymous",
+                      "dependencyConditions": [
+                        "Skipped",
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "variableName": "system_error",
+                    "value": {
+                      "value": "@join(createArray(\nconcat('{\"activity_name\":\"Copy data from API to ADLS oauth anonymous\",\"error\":\"',activity('Copy data from API to ADLS oauth anonymous')?.Error?.message,'\",\"status\":\"',activity('Copy data from API to ADLS oauth anonymous')?.status,'\"}')\n),',')",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                {
+                  "name": "Fail Switch oauth2absurlanonymous",
+                  "type": "Fail",
+                  "dependsOn": [
+                    {
+                      "activity": "Append system_error Switch oauth2absurlanonymous",
+                      "dependencyConditions": [
+                        "Succeeded"
+                      ]
+                    }
+                  ],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "message": "Explicit Fail for Switch Case",
+                    "errorCode": "00000"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "basic-range-username-password",
+              "activities": [
+                {
+                  "name": "Fail1_copy2",
+                  "type": "Fail",
+                  "dependsOn": [],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "message": "failed",
+                    "errorCode": "500"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "basic-absurl-username-password",
+              "activities": [
+                {
+                  "name": "Fail1_copy3",
+                  "type": "Fail",
+                  "dependsOn": [],
+                  "userProperties": [],
+                  "typeProperties": {
+                    "message": "failed",
+                    "errorCode": "500"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Switch API copy data",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Lookup ingestion creds config\",\"error\":\"',activity('Lookup ingestion creds config')?.Error?.message,'\",\"status\":\"',activity('Lookup ingestion creds config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Switch API copy data\",\"error\":\"',activity('Switch API copy data')?.Error?.message,'\",\"status\":\"',activity('Switch API copy data')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "stage_name": "INGESTION-API"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "api_type": {
+        "type": "string"
+      },
+      "system_auth": {
+        "type": "string"
+      },
+      "config_file_name": {
+        "type": "string"
+      },
+      "config_file_path": {
+        "type": "string"
+      },
+      "api_url": {
+        "type": "string"
+      },
+      "dyn_json_mapping": {
+        "type": "string"
+      },
+      "offset_range": {
+        "type": "string"
+      },
+      "max_request_number": {
+        "type": "string"
+      },
+      "sink_file_path": {
+        "type": "string"
+      },
+      "sink_file_name": {
+        "type": "string"
+      },
+      "absolute_url": {
+        "type": "string"
+      },
+      "total_batch_num": {
+        "type": "string"
+      },
+      "file_type": {
+        "type": "string"
+      },
+      "api_last_batch_only": {
+        "type": "string"
+      },
+      "batch_number": {
+        "type": "string"
+      },
+      "dyn_csv_mapping": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/INGESTION/API"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:29Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

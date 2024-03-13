@@ -1,0 +1,79 @@
+{
+  "name": "DF_GEN_ADA_RULES_DYN_PARAMS",
+  "properties": {
+    "folder": {
+      "name": "DF_ADA"
+    },
+    "type": "MappingDataFlow",
+    "typeProperties": {
+      "sources": [
+        {
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference"
+          },
+          "name": "source1"
+        }
+      ],
+      "sinks": [
+        {
+          "name": "sinktopipeline"
+        }
+      ],
+      "transformations": [
+        {
+          "name": "filterWithTableName"
+        },
+        {
+          "name": "aggregate1"
+        },
+        {
+          "name": "derivedColumnexpr"
+        },
+        {
+          "name": "aggregatemax"
+        },
+        {
+          "name": "selectreqcols"
+        }
+      ],
+      "scriptLines": [
+        "parameters{",
+        "     TableName as string",
+        "}",
+        "source(output(",
+        "          source_table_name as string,",
+        "          rule_type as string,",
+        "          Expr as string,",
+        "          error_table_name as string,",
+        "          target_table_name as string",
+        "     ),",
+        "     allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     ignoreNoFilesFound: false) ~> source1",
+        "source1 filter(target_table_name==$TableName) ~> filterWithTableName",
+        "filterWithTableName aggregate(groupBy(rule_type),",
+        "     target_table_name = toString(reduce(collect(toString(byName(\"Expr\"))),'',#item+','+#acc,#result)),",
+        "          dummycol = max('1')) ~> aggregate1",
+        "aggregate1 derive(dq_expression_col = iif(lower(rule_type)=='dq_rule', concat('concat(',substring(target_table_name,0,minus(length(target_table_name),1)),')'),\"concat(\\\\'\\\\')\"),",
+        "          filter_expression_col = iif(lower(rule_type)=='filter_condition', concat('concat(',substring(target_table_name,0,minus(length(target_table_name),1)),')'),  \"concat(\\\\'\\\\')\")) ~> derivedColumnexpr",
+        "derivedColumnexpr aggregate(groupBy(dummycol),",
+        "     dq_expression = max(dq_expression_col),",
+        "          filter_expression = max(filter_expression_col)) ~> aggregatemax",
+        "aggregatemax select(mapColumn(",
+        "          dq_expression,",
+        "          filter_expression",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> selectreqcols",
+        "selectreqcols sink(validateSchema: false,",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true,",
+        "     store: 'cache',",
+        "     format: 'inline',",
+        "     output: true,",
+        "     saveOrder: 1) ~> sinktopipeline"
+      ]
+    }
+  }
+}

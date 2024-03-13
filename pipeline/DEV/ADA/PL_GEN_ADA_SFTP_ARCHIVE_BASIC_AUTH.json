@@ -1,0 +1,627 @@
+{
+  "name": "PL_GEN_ADA_SFTP_ARCHIVE_BASIC_AUTH",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup ingestion creds config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@pipeline().parameters.config_file_path",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@pipeline().parameters.config_file_name",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Web Get SFTP User Name",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_user_name_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Get password kv name",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "password_key_name",
+          "value": {
+            "value": "@activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_password_kv']",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Web Get SFTP Hostname",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_host_name_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Iterate on file names",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Get FileName from sftp_log_filenames",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Get FileName from sftp_log_filenames').output.value\n",
+            "type": "Expression"
+          },
+          "isSequential": false,
+          "activities": [
+            {
+              "name": "Copy From INPUT to ARCHIVE",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource",
+                  "storeSettings": {
+                    "type": "SftpReadSettings",
+                    "recursive": true,
+                    "deleteFilesAfterCompletion": false,
+                    "disableChunking": false
+                  },
+                  "formatSettings": {
+                    "type": "BinaryReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "BinarySink",
+                  "storeSettings": {
+                    "type": "SftpWriteSettings",
+                    "operationTimeout": "01:00:00",
+                    "useTempFileRename": false
+                  }
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.sftp_file_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "password_key_name": {
+                      "value": "@variables('password_key_name')",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@item().source_file_name",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@replace(pipeline().parameters.sftp_file_path,'INPUT','ARCHIVE')",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "password_key_name": {
+                      "value": "@variables('password_key_name')",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@item().source_file_name",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Delete files from INPUT",
+              "type": "Delete",
+              "dependsOn": [
+                {
+                  "activity": "Copy From INPUT to ARCHIVE",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "dataset": {
+                  "referenceName": "DS_GEN_ADA_SFTP_FILES_BINARY",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder_path": {
+                      "value": "@pipeline().parameters.sftp_file_path",
+                      "type": "Expression"
+                    },
+                    "host_name": {
+                      "value": "@activity('Web Get SFTP Hostname').output.value",
+                      "type": "Expression"
+                    },
+                    "user_name": {
+                      "value": "@activity('Web Get SFTP User Name').output.value",
+                      "type": "Expression"
+                    },
+                    "password_key_name": {
+                      "value": "@variables('password_key_name')",
+                      "type": "Expression"
+                    },
+                    "kv_name": {
+                      "value": "@pipeline().globalParameters.keyvault_name",
+                      "type": "Expression"
+                    },
+                    "file_name": {
+                      "value": "@item().source_file_name",
+                      "type": "Expression"
+                    },
+                    "port_number": {
+                      "value": "@int(activity('Get Web port number').output.value)",
+                      "type": "Expression"
+                    }
+                  }
+                },
+                "enableLogging": false,
+                "storeSettings": {
+                  "type": "SftpReadSettings",
+                  "recursive": true,
+                  "enablePartitionDiscovery": false,
+                  "disableChunking": false
+                }
+              }
+            },
+            {
+              "name": "Append system_error Iterate on file names",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "Delete files from INPUT",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"Copy From INPUT to ARCHIVE\",\"error\":\"',activity('Copy From INPUT to ARCHIVE')?.Error?.message,'\",\"status\":\"',activity('Copy From INPUT to ARCHIVE')?.status,'\"}'),\nconcat('{\"activity_name\":\"Delete files from INPUT\",\"error\":\"',activity('Delete files from INPUT')?.Error?.message,'\",\"status\":\"',activity('Delete files from INPUT')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail Iterate on file names",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error Iterate on file names",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Get Web port number",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Lookup ingestion creds config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Lookup ingestion creds config').output.value[0].SFTP[pipeline().parameters.system_name]['sftp_port_number_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Get FileName from sftp_log_filenames",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Get Web port number",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get SFTP Hostname",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Get password kv name",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get SFTP User Name",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureDatabricksDeltaLakeSource",
+            "query": {
+              "value": "SELECT DISTINCT source_file_name  FROM @{pipeline().parameters.schema_name}.@{pipeline().parameters.log_table_name} WHERE data_source_name = '@{pipeline().parameters.data_source}' AND log_parent_run_id = '@{pipeline().parameters.log_parent_run_id}'",
+              "type": "Expression"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+            "type": "DatasetReference",
+            "parameters": {
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              },
+              "SchemaName": {
+                "value": "@pipeline().parameters.schema_name",
+                "type": "Expression"
+              },
+              "TableName": {
+                "value": "@pipeline().parameters.log_table_name",
+                "type": "Expression"
+              },
+              "adb_url": {
+                "value": "@pipeline().parameters.adb_url",
+                "type": "Expression"
+              },
+              "adb_cluster_id": {
+                "value": "@pipeline().parameters.adb_cluster_id",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "Iterate on file names",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"Lookup ingestion creds config\",\"error\":\"',activity('Lookup ingestion creds config')?.Error?.message,'\",\"status\":\"',activity('Lookup ingestion creds config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get SFTP User Name\",\"error\":\"',activity('Web Get SFTP User Name')?.Error?.message,'\",\"status\":\"',activity('Web Get SFTP User Name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get password kv name\",\"error\":\"',activity('Get password kv name')?.Error?.message,'\",\"status\":\"',activity('Get password kv name')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get SFTP Hostname\",\"error\":\"',activity('Web Get SFTP Hostname')?.Error?.message,'\",\"status\":\"',activity('Web Get SFTP Hostname')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get Web port number\",\"error\":\"',activity('Get Web port number')?.Error?.message,'\",\"status\":\"',activity('Get Web port number')?.status,'\"}'),\nconcat('{\"activity_name\":\"Get FileName from sftp_log_filenames\",\"error\":\"',activity('Get FileName from sftp_log_filenames')?.Error?.message,'\",\"status\":\"',activity('Get FileName from sftp_log_filenames')?.status,'\"}'),\nconcat('{\"activity_name\":\"Iterate on file names\",\"error\":\"',activity('Iterate on file names')?.Error?.message,'\",\"status\":\"',activity('Iterate on file names')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@pipeline().parameters.log_parent_run_id",
+              "type": "Expression"
+            },
+            "data_source_type": {
+              "value": "@pipeline().parameters.source_type",
+              "type": "Expression"
+            },
+            "stage_name": "DATA_JOIN_AGGREGATION"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "system_name": {
+        "type": "string"
+      },
+      "adls_file_path": {
+        "type": "string"
+      },
+      "file_pattern": {
+        "type": "string"
+      },
+      "sftp_file_path": {
+        "type": "string"
+      },
+      "config_file_path": {
+        "type": "string"
+      },
+      "config_file_name": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "adb_url": {
+        "type": "string"
+      },
+      "adb_cluster_id": {
+        "type": "string"
+      },
+      "adb_token_kv": {
+        "type": "string"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "auth_type": {
+        "type": "string"
+      },
+      "schema_name": {
+        "type": "string"
+      },
+      "log_table_name": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "password_key_name": {
+        "type": "String"
+      },
+      "notebook_output_md5flag": {
+        "type": "String"
+      },
+      "params_lists": {
+        "type": "String"
+      },
+      "v": {
+        "type": "String"
+      },
+      "error_flag_filename": {
+        "type": "String"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/ARCHIVE FILES"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:29Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}

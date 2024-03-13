@@ -1,0 +1,174 @@
+{
+  "name": "DF_GEN_ADA_TRANS_DYN_PARAMS",
+  "properties": {
+    "folder": {
+      "name": "DF_ADA"
+    },
+    "type": "MappingDataFlow",
+    "typeProperties": {
+      "sources": [
+        {
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference"
+          },
+          "name": "tranformrules"
+        }
+      ],
+      "sinks": [
+        {
+          "name": "cachdynmcols"
+        }
+      ],
+      "transformations": [
+        {
+          "name": "ConcatColNames"
+        },
+        {
+          "name": "ConcatColExprValue"
+        },
+        {
+          "name": "ColRowTransform"
+        },
+        {
+          "name": "SelectFinalColumns"
+        },
+        {
+          "name": "SelectColumns"
+        },
+        {
+          "name": "unionallsources"
+        },
+        {
+          "name": "derivestaticcolumns"
+        },
+        {
+          "name": "flattenstaticvalues"
+        },
+        {
+          "name": "GetMaxRecords"
+        },
+        {
+          "name": "GenerateRowNumbers"
+        },
+        {
+          "name": "addsourcenumber"
+        },
+        {
+          "name": "derivedColumns"
+        },
+        {
+          "name": "Filterrows"
+        },
+        {
+          "name": "getonerecord"
+        },
+        {
+          "name": "windowordinalposition"
+        },
+        {
+          "name": "derivedColumnsource"
+        },
+        {
+          "name": "filterrulestable"
+        },
+        {
+          "name": "derivedColumn1"
+        },
+        {
+          "name": "aggregate1"
+        },
+        {
+          "name": "flattensrccolumns"
+        }
+      ],
+      "scriptLines": [
+        "parameters{",
+        "     TableName as string,",
+        "     Col_names as string ('accounttype,accountnumber,postingdate,documentnumber,documentdate,amount,description,currencycode,ada_seq_row_num,code,valuecode,ada_file_name_identifier,ada_curr_timestamp,ada_modified_date,ada_unique_key,ada_log_parent_uuid')",
+        "}",
+        "source(output(",
+        "          source_table_name as string,",
+        "          columns_schema_sheet_name as string,",
+        "          column_name as string,",
+        "          Expr as string,",
+        "          target_table_name as string",
+        "     ),",
+        "     allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     ignoreNoFilesFound: false) ~> tranformrules",
+        "SelectColumns aggregate(groupBy({Dummy Value}),",
+        "     {Column Names} = split(toString(reduce(collect(toString(byName(\"column_name\"))),'',#item+'~'+#acc,#result)),'~')) ~> ConcatColNames",
+        "SelectColumns aggregate(groupBy({Dummy Value}),",
+        "     {Expr value} = toString(reduce(collect(toString(byName(\"Expr\"))),'',#item+'~'+#acc,#result))) ~> ConcatColExprValue",
+        "ConcatColExprValue, ConcatColNames join(ConcatColExprValue@{Dummy Value} == ConcatColNames@{Dummy Value},",
+        "     joinType:'inner',",
+        "     matchType:'exact',",
+        "     ignoreSpaces: false,",
+        "     broadcast: 'auto')~> ColRowTransform",
+        "ColRowTransform select(mapColumn(",
+        "          Exprvalue = {Expr value},",
+        "          ColumnName = {Column Names}",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> SelectFinalColumns",
+        "Filterrows select(mapColumn(",
+        "          column_name = ColumnName,",
+        "          {Dummy Value},",
+        "          Expr = ExprValue",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> SelectColumns",
+        "derivedColumnsource, flattenstaticvalues, addsourcenumber union(byName: true)~> unionallsources",
+        "getonerecord derive(test_col = [\"ADF_BLANK_COL_1\",\"ADF_BLANK_COL_2\",\"ADF_BLANK_COL_3\",\"ADF_BLANK_COL_4\",\"ADF_BLANK_COL_5\",\"ADF_BLANK_COL_6\",\"ADF_BLANK_COL_7\",\"ADF_BLANK_COL_8\",\"ADF_BLANK_COL_9\",\"ADF_BLANK_COL_10\",\"ADF_BLANK_COL_11\",\"ADF_BLANK_COL_12\",\"ADF_BLANK_COL_13\",\"ADF_BLANK_COL_14\",\"ADF_BLANK_COL_15\",\"ADF_BLANK_COL_16\",\"ADF_BLANK_COL_17\",\"ADF_BLANK_COL_18\",\"ADF_BLANK_COL_19\",\"ADF_BLANK_COL_20\",\"ADF_BLANK_COL_21\",\"ADF_BLANK_COL_22\",\"ADF_BLANK_COL_23\",\"ADF_BLANK_COL_24\",\"ADF_BLANK_COL_25\",\"ADF_BLANK_COL_26\",\"ADF_BLANK_COL_27\",\"ADF_BLANK_COL_28\",\"ADF_BLANK_COL_29\",\"ADF_BLANK_COL_30\",\"ADF_BLANK_COL_31\",\"ADF_BLANK_COL_32\",\"ADF_BLANK_COL_33\",\"ADF_BLANK_COL_34\",\"ADF_BLANK_COL_35\",\"ADF_BLANK_COL_36\",\"ADF_BLANK_COL_37\",\"ADF_BLANK_COL_38\",\"ADF_BLANK_COL_39\",\"ADF_BLANK_COL_40\",\"ADF_BLANK_COL_41\",\"ADF_BLANK_COL_42\",\"ADF_BLANK_COL_43\",\"ADF_BLANK_COL_44\",\"ADF_BLANK_COL_45\",\"ADF_BLANK_COL_46\",\"ADF_BLANK_COL_47\",\"ADF_BLANK_COL_48\",\"ADF_BLANK_COL_49\",\"ADF_BLANK_COL_50\",\"ADF_BLANK_COL_51\",\"ADF_BLANK_COL_52\",\"ADF_BLANK_COL_53\",\"ADF_BLANK_COL_54\",\"ADF_BLANK_COL_55\",\"ADF_BLANK_COL_56\",\"ADF_BLANK_COL_57\",\"ADF_BLANK_COL_58\",\"ADF_BLANK_COL_59\",\"ADF_BLANK_COL_60\",\"ADF_BLANK_COL_61\",\"ADF_BLANK_COL_62\",\"ADF_BLANK_COL_63\",\"ADF_BLANK_COL_64\",\"ADF_BLANK_COL_65\",\"ADF_BLANK_COL_66\",\"ADF_BLANK_COL_67\",\"ADF_BLANK_COL_68\",\"ADF_BLANK_COL_69\",\"ADF_BLANK_COL_70\",\"ADF_BLANK_COL_71\",\"ADF_BLANK_COL_72\",\"ADF_BLANK_COL_73\",\"ADF_BLANK_COL_74\",\"ADF_BLANK_COL_75\",\"ADF_BLANK_COL_76\",\"ADF_BLANK_COL_77\",\"ADF_BLANK_COL_78\",\"ADF_BLANK_COL_79\",\"ADF_BLANK_COL_80\",\"ADF_BLANK_COL_81\",\"ADF_BLANK_COL_82\",\"ADF_BLANK_COL_83\",\"ADF_BLANK_COL_84\",\"ADF_BLANK_COL_85\",\"ADF_BLANK_COL_86\",\"ADF_BLANK_COL_87\",\"ADF_BLANK_COL_88\",\"ADF_BLANK_COL_89\",\"ADF_BLANK_COL_90\",\"ADF_BLANK_COL_91\",\"ADF_BLANK_COL_92\",\"ADF_BLANK_COL_93\",\"ADF_BLANK_COL_94\",\"ADF_BLANK_COL_95\",\"ADF_BLANK_COL_96\",\"ADF_BLANK_COL_97\",\"ADF_BLANK_COL_98\",\"ADF_BLANK_COL_99\",\"ADF_BLANK_COL_100\"],",
+        "          source = '3') ~> derivestaticcolumns",
+        "derivestaticcolumns foldDown(unroll(test_col, test_col),",
+        "     mapColumn(",
+        "          column_name = test_col,",
+        "          source",
+        "     ),",
+        "     skipDuplicateMapInputs: false,",
+        "     skipDuplicateMapOutputs: false) ~> flattenstaticvalues",
+        "unionallsources aggregate(groupBy(column_name),",
+        "     Expr = max(Expr),",
+        "          ordinal_position = max(ordinal_position),",
+        "          source = max(source)) ~> GetMaxRecords",
+        "GetMaxRecords window(asc(ordinal_position, false),",
+        "     asc(source, false),",
+        "     asc(column_name, false),",
+        "     row_num = rowNumber()) ~> GenerateRowNumbers",
+        "filterrulestable derive(source = '2') ~> addsourcenumber",
+        "GenerateRowNumbers derive(ColumnName = case(iifNull(trim(toString(byName(\"column_name\"))),\"Empty\")=='Empty' || trim(toString(byName(\"column_name\")))=='' || left(toString(byName(\"column_name\")),14)=='ADF_BLANK_COL_'  ,concat('ADF_BLANK_COL_',toString(row_num)),toString(byName(\"column_name\"))),",
+        "          ExprValue = case(iifNull(trim(toString(byName(\"column_name\"))),\"Empty\")=='Empty' || trim(toString(byName(\"column_name\")))==''  || left(toString(byName(\"column_name\")),14)=='ADF_BLANK_COL_',concat('\\\\','\\'','\\\\','\\''),coalesce(toString(byName(\"Expr\")),concat('toString(byName(','\\\\','\\'',toString(byName(\"column_name\")),'\\\\','\\'))'))),",
+        "          {Dummy Value} = toString('1'),",
+        "          column1 = coalesce(toString(byName(\"Expr\")),concat('toString(byName(','\\\\','\\'',toString(byName(\"column_name\")),'\\\\','\\'))'))) ~> derivedColumns",
+        "derivedColumns filter(row_num<=100) ~> Filterrows",
+        "derivedColumnsource aggregate(groupBy(ordinal_position),",
+        "     source_max = max(ordinal_position)) ~> getonerecord",
+        "flattensrccolumns window(asc(column_name, true),",
+        "     ordinal_position = rowNumber()) ~> windowordinalposition",
+        "windowordinalposition derive(source = '1') ~> derivedColumnsource",
+        "tranformrules filter(target_table_name==$TableName) ~> filterrulestable",
+        "addsourcenumber derive(src_cols = $Col_names,",
+        "          column1 = '1') ~> derivedColumn1",
+        "derivedColumn1 aggregate(groupBy(column1),",
+        "     column_name = split(max(src_cols),',')) ~> aggregate1",
+        "aggregate1 foldDown(unroll(column_name),",
+        "     mapColumn(",
+        "          column1,",
+        "          column_name",
+        "     ),",
+        "     skipDuplicateMapInputs: false,",
+        "     skipDuplicateMapOutputs: false) ~> flattensrccolumns",
+        "SelectFinalColumns sink(allowSchemaDrift: true,",
+        "     validateSchema: false,",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true,",
+        "     store: 'cache',",
+        "     format: 'inline',",
+        "     output: true,",
+        "     saveOrder: 1) ~> cachdynmcols"
+      ]
+    }
+  }
+}
