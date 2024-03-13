@@ -1,0 +1,891 @@
+{
+  "name": "PL_GEN_ADA_MASTER",
+  "properties": {
+    "activities": [
+      {
+        "name": "Lookup Metadata template",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Web Get ADB ClusterId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get ADB Repo Url",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Web Get ADB Url",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "ExcelSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_BLOB_EXCEL",
+            "type": "DatasetReference",
+            "parameters": {
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "metadata_folder": {
+                "value": "@activity('Read master config').output.value[0].folder_path.fp_metadata",
+                "type": "Expression"
+              },
+              "metadata_file": {
+                "value": "@concat(pipeline().parameters.tenant_id,'_',pipeline().parameters.data_source,activity('Read master config').output.value[0]['file_meta']['suffix_metadata_template'])",
+                "type": "Expression"
+              },
+              "metadata_sheet": "execution_flow",
+              "storage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "ForEach datasource",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Nb Get Cleaned File Pattern",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Filter is active execution flow').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "check empty for execute pipeline",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "value": "@empty(variables('executepipeline_error'))",
+                  "type": "Expression"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "EXECUTION_STEPS",
+                    "type": "ExecutePipeline",
+                    "dependsOn": [],
+                    "policy": {
+                      "secureInput": false
+                    },
+                    "userProperties": [],
+                    "typeProperties": {
+                      "pipeline": {
+                        "referenceName": "PL_GEN_ADA_MASTER_EXECUTION_STEPS",
+                        "type": "PipelineReference"
+                      },
+                      "waitOnCompletion": true,
+                      "parameters": {
+                        "file_pattern": {
+                          "value": "@activity('Nb Get Cleaned File Pattern').output.runOutput",
+                          "type": "Expression"
+                        },
+                        "source_type": {
+                          "value": "@item().source_type",
+                          "type": "Expression"
+                        },
+                        "log_parent_run_id": {
+                          "value": "@variables('var_log_parent_run_id')",
+                          "type": "Expression"
+                        },
+                        "tenant_id": {
+                          "value": "@item().tenant_id",
+                          "type": "Expression"
+                        },
+                        "date_path": {
+                          "value": "@variables('var_date_path')",
+                          "type": "Expression"
+                        },
+                        "data_source": {
+                          "value": "@pipeline().parameters.data_source",
+                          "type": "Expression"
+                        },
+                        "execution_step_name": {
+                          "value": "@item().execution_step_name",
+                          "type": "Expression"
+                        },
+                        "sheet_name": {
+                          "value": "@item().sheet_name",
+                          "type": "Expression"
+                        },
+                        "table_schema_name": {
+                          "value": "@item().table_schema_name",
+                          "type": "Expression"
+                        },
+                        "filter_table_name": {
+                          "value": "@item().filter_table_name",
+                          "type": "Expression"
+                        },
+                        "adb_url": {
+                          "value": "@activity('Web Get ADB Url').output.value",
+                          "type": "Expression"
+                        },
+                        "adb_cluster_id": {
+                          "value": "@activity('Web Get ADB ClusterId').output.value",
+                          "type": "Expression"
+                        },
+                        "adb_token_kv": {
+                          "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+                          "type": "Expression"
+                        },
+                        "adb_repo_url": {
+                          "value": "@activity('Web Get ADB Repo Url').output.value",
+                          "type": "Expression"
+                        },
+                        "log_table_name": {
+                          "value": "@item().log_table_name",
+                          "type": "Expression"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "EXECUTION_STEPS_Error",
+                    "type": "SetVariable",
+                    "dependsOn": [
+                      {
+                        "activity": "EXECUTION_STEPS",
+                        "dependencyConditions": [
+                          "Failed"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "secureOutput": false,
+                      "secureInput": false
+                    },
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "executepipeline_error",
+                      "value": {
+                        "value": "@activity('EXECUTION_STEPS').Error.message",
+                        "type": "Expression"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Append system_error ForEach datasource",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "check empty for execute pipeline",
+                  "dependencyConditions": [
+                    "Skipped",
+                    "Failed"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "system_error",
+                "value": {
+                  "value": "@join(createArray(\nconcat('{\"activity_name\":\"check empty for execute pipeline\",\"error\":\"',activity('check empty for execute pipeline')?.Error?.message,'\",\"status\":\"',activity('check empty for execute pipeline')?.status,'\"}'),\nconcat('{\"activity_name\":\"EXECUTION_STEPS\",\"error\":\"',activity('EXECUTION_STEPS')?.Error?.message,'\",\"status\":\"',activity('EXECUTION_STEPS')?.status,'\"}'),\nconcat('{\"activity_name\":\"EXECUTION_STEPS_error\",\"error\":\"',activity('EXECUTION_STEPS_error')?.Error?.message,'\",\"status\":\"',activity('EXECUTION_STEPS_error')?.status,'\"}')\n),',')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Fail ForEach data source",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "Append system_error ForEach datasource",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "Explicit Fail for @{string(item())}",
+                  "type": "Expression"
+                },
+                "errorCode": "00000"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "check date_path value",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Filter is active execution flow",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "Lookup Metadata template",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup Metadata template').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@equals(item().is_active,'1')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Web Get ADB Url",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_url_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Web Get ADB Repo Url",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_repo_url_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Web Get ADB ClusterId",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "method": "GET",
+          "url": {
+            "value": "@concat('https://',pipeline().globalParameters.keyvault_name,'.vault.azure.net/secrets/',activity('Read master config').output.value[0].keyvault_credentials['adb_clusterid_kv'],'?api-version=7.0')",
+            "type": "Expression"
+          },
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          }
+        }
+      },
+      {
+        "name": "Nb Get Cleaned File Pattern",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Filter is active execution flow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat(activity('Web Get ADB Repo Url').output.value,'ada_workflow/utils/case_converter')",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "input_file_string": {
+              "value": "@activity('Filter is active execution flow').output.value[0].file_pattern",
+              "type": "Expression"
+            },
+            "replace_values": {
+              "value": "@activity('Read master config').output.value[0].common_config['file_name_replace_pattern']",
+              "type": "Expression"
+            },
+            "input_type": "string",
+            "file_pattern": "NA"
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_ADA_ADB",
+          "type": "LinkedServiceReference",
+          "parameters": {
+            "kv_name": {
+              "value": "@pipeline().globalParameters.keyvault_name",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_token_kv": {
+              "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "if condition check_error",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ForEach datasource",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@empty(variables('executepipeline_error'))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "Fail if error",
+              "type": "Fail",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "value": "@concat('Failed with following reason', variables('executepipeline_error'))",
+                  "type": "Expression"
+                },
+                "errorCode": "200"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "check date_path value",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "check log_parent_run_id value",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(equals(pipeline().parameters.date_path,''), empty(pipeline().parameters.date_path))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "getting value from date_path param",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_date_path",
+                "value": {
+                  "value": "@pipeline().parameters.date_path",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifTrueActivities": [
+            {
+              "name": "Generate date_path value",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_date_path",
+                "value": {
+                  "value": "@replace(replace(string(utcnow('yyyy-MM-dd HH:mm:ss')),' ','-' ),':','-')",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "check log_parent_run_id value",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@or(equals(pipeline().parameters.log_parent_run_id,''), empty(pipeline().parameters.log_parent_run_id))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "getting value from log_parent_run_id param",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_log_parent_run_id",
+                "value": {
+                  "value": "@pipeline().parameters.log_parent_run_id",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifTrueActivities": [
+            {
+              "name": "Generate log_parent_run_id value",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_log_parent_run_id",
+                "value": {
+                  "value": "@pipeline().RunId",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Append system_error master",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "if condition check_error",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "system_error",
+          "value": {
+            "value": "@join(createArray(\nconcat('{\"activity_name\":\"check date_path value\",\"error\":\"',activity('check date_path value')?.Error?.message,'\",\"status\":\"',activity('check date_path value')?.status,'\"}'),\nconcat('{\"activity_name\":\"Generate date_path value\",\"error\":\"',activity('Generate date_path value')?.Error?.message,'\",\"status\":\"',activity('Generate date_path value')?.status,'\"}'),\nconcat('{\"activity_name\":\"getting value from date_path param\",\"error\":\"',activity('getting value from date_path param')?.Error?.message,'\",\"status\":\"',activity('getting value from date_path param')?.status,'\"}'),\nconcat('{\"activity_name\":\"Read master config\",\"error\":\"',activity('Read master config')?.Error?.message,'\",\"status\":\"',activity('Read master config')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get ADB Url\",\"error\":\"',activity('Web Get ADB Url')?.Error?.message,'\",\"status\":\"',activity('Web Get ADB Url')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get ADB Repo Url\",\"error\":\"',activity('Web Get ADB Repo Url')?.Error?.message,'\",\"status\":\"',activity('Web Get ADB Repo Url')?.status,'\"}'),\nconcat('{\"activity_name\":\"Web Get ADB ClusterId\",\"error\":\"',activity('Web Get ADB ClusterId')?.Error?.message,'\",\"status\":\"',activity('Web Get ADB ClusterId')?.status,'\"}'),\nconcat('{\"activity_name\":\"Lookup Metadata template\",\"error\":\"',activity('Lookup Metadata template')?.Error?.message,'\",\"status\":\"',activity('Lookup Metadata template')?.status,'\"}'),\nconcat('{\"activity_name\":\"Filter is active execution flow\",\"error\":\"',activity('Filter is active execution flow')?.Error?.message,'\",\"status\":\"',activity('Filter is active execution flow')?.status,'\"}'),\nconcat('{\"activity_name\":\"Nb Get Cleaned File Pattern\",\"error\":\"',activity('Nb Get Cleaned File Pattern')?.Error?.message,'\",\"status\":\"',activity('Nb Get Cleaned File Pattern')?.status,'\"}'),\nconcat('{\"activity_name\":\"ForEach datasource\",\"error\":\"',activity('ForEach datasource')?.Error?.message,'\",\"status\":\"',activity('ForEach datasource')?.status,'\"}'),\nconcat('{\"activity_name\":\"if condition check_error\",\"error\":\"',activity('if condition check_error')?.Error?.message,'\",\"status\":\"',activity('if condition check_error')?.status,'\"}')\n),',')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline Error Log",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Append system_error master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_ADF_ERROR_LOGS",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "Log": {
+              "value": "@json(string(concat('[',join(variables('system_error'),','),']')))",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@variables('var_log_parent_run_id')",
+              "type": "Expression"
+            },
+            "stage_name": "MASTER"
+          }
+        }
+      },
+      {
+        "name": "Execute Pipeline monitoring",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "ForEach datasource",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_MONITORING",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@variables('var_log_parent_run_id')",
+              "type": "Expression"
+            },
+            "stages": {
+              "value": "@createArray('BC','DQ','SUMMARY')",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_repo_url": {
+              "value": "@activity('Web Get ADB Repo Url').output.value",
+              "type": "Expression"
+            },
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "execution_start_time": {
+              "value": "@formatDateTime(convertTimeZone(pipeline().TriggerTime,'UTC','India Standard Time'),'yyyy-MM-dd HH:mm:ss')",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Execute Success Alert",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "if condition check_error",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_EMAIL_ALERT",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@variables('var_log_parent_run_id')",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "alert_email_type": "success",
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_repo_url": {
+              "value": "@activity('Web Get ADB Repo Url').output.value",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "Execute System Failure Alert",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "if condition check_error",
+            "dependencyConditions": [
+              "Skipped",
+              "Failed"
+            ]
+          }
+        ],
+        "policy": {
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "PL_GEN_ADA_EMAIL_ALERT",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true,
+          "parameters": {
+            "tenant_id": {
+              "value": "@pipeline().parameters.tenant_id",
+              "type": "Expression"
+            },
+            "log_parent_run_id": {
+              "value": "@variables('var_log_parent_run_id')",
+              "type": "Expression"
+            },
+            "data_source": {
+              "value": "@pipeline().parameters.data_source",
+              "type": "Expression"
+            },
+            "alert_email_type": "system_failure",
+            "failure_reason": {
+              "value": "@coalesce(\n\tactivity('check log_parent_run_id value')?.Error?.message,\n\tactivity('check date_path value')?.Error?.message,\n\tactivity('Read master config')?.Error?.message,\n\tactivity('Web Get ADB Url')?.Error?.message,\n\tactivity('Web Get ADB Repo Url')?.Error?.message,\n\tactivity('Web Get ADB ClusterId')?.Error?.message,\n\tactivity('Lookup Metadata template')?.Error?.message,\n\tactivity('Filter is active execution flow')?.Error?.message,\n\tactivity('Nb Get Cleaned File Pattern')?.Error?.message,\n\tactivity('ForEach datasource')?.Error?.message,\n\tactivity('if condition check_error')?.Error?.message\n)",
+              "type": "Expression"
+            },
+            "adb_url": {
+              "value": "@activity('Web Get ADB Url').output.value",
+              "type": "Expression"
+            },
+            "adb_cluster_id": {
+              "value": "@activity('Web Get ADB ClusterId').output.value",
+              "type": "Expression"
+            },
+            "adb_repo_url": {
+              "value": "@activity('Web Get ADB Repo Url').output.value",
+              "type": "Expression"
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "date_path": {
+        "type": "string"
+      },
+      "data_source": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "log_parent_run_id": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "error_reason": {
+        "type": "String"
+      },
+      "executepipeline_error": {
+        "type": "String"
+      },
+      "var_log_parent_run_id": {
+        "type": "String"
+      },
+      "var_date_path": {
+        "type": "String"
+      },
+      "system_error": {
+        "type": "Array"
+      }
+    },
+    "folder": {
+      "name": "ADA/MASTER_PIPELINE"
+    },
+    "annotations": [],
+    "lastPublishTime": "2023-12-21T05:49:30Z"
+  },
+  "type": "Microsoft.DataFactory/factories/pipelines"
+}
