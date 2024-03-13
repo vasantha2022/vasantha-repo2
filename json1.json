@@ -1,0 +1,1249 @@
+{
+  "name": "PL_GEN_ADA_MONITORING",
+  "properties": {
+    "activities": [
+      {
+        "name": "Read master config",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "JsonSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "JsonReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_ADLS_JSON",
+            "type": "DatasetReference",
+            "parameters": {
+              "file_path": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[0]",
+                "type": "Expression"
+              },
+              "file_name": {
+                "value": "@split(pipeline().globalParameters.config_master,'/')[1]",
+                "type": "Expression"
+              },
+              "container_name": {
+                "value": "@pipeline().globalParameters.container_name",
+                "type": "Expression"
+              },
+              "stroage_name": {
+                "value": "@pipeline().globalParameters.storage_account_name",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "ForEach1",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Read master config",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "value": "@pipeline().parameters.stages",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Switch log table",
+              "type": "Switch",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "on": {
+                  "value": "@if(equals(toUpper(item()),'SUMMARY'),toUpper(item()),take(item(),2))",
+                  "type": "Expression"
+                },
+                "cases": [
+                  {
+                    "value": "DQ",
+                    "activities": [
+                      {
+                        "name": "Nb get transformed dq table",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "notebookPath": {
+                            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/monitoring/replicate_dq_table')",
+                            "type": "Expression"
+                          },
+                          "baseParameters": {
+                            "data_source": {
+                              "value": "@pipeline().parameters.data_source",
+                              "type": "Expression"
+                            },
+                            "log_parent_run_id": {
+                              "value": "@pipeline().parameters.log_parent_run_id",
+                              "type": "Expression"
+                            },
+                            "stage": {
+                              "value": "@item()",
+                              "type": "Expression"
+                            },
+                            "container_name": {
+                              "value": "@pipeline().globalParameters.container_name",
+                              "type": "Expression"
+                            },
+                            "storage_account": {
+                              "value": "@pipeline().globalParameters.storage_account_name",
+                              "type": "Expression"
+                            },
+                            "master_config_file": {
+                              "value": "@pipeline().globalParameters.config_master",
+                              "type": "Expression"
+                            }
+                          }
+                        },
+                        "linkedServiceName": {
+                          "referenceName": "LS_ADA_ADB",
+                          "type": "LinkedServiceReference",
+                          "parameters": {
+                            "kv_name": {
+                              "value": "@pipeline().globalParameters.keyvault_name",
+                              "type": "Expression"
+                            },
+                            "adb_url": {
+                              "value": "@pipeline().parameters.adb_url",
+                              "type": "Expression"
+                            },
+                            "adb_cluster_id": {
+                              "value": "@pipeline().parameters.adb_cluster_id",
+                              "type": "Expression"
+                            },
+                            "adb_token_kv": {
+                              "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+                              "type": "Expression"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "DQ_ERROR_LOGGING",
+                        "type": "Copy",
+                        "dependsOn": [
+                          {
+                            "activity": "Nb get transformed dq table",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [
+                          {
+                            "name": "Source",
+                            "value": "@{'<SchemaName>'}.@{'<TableName>'}"
+                          }
+                        ],
+                        "typeProperties": {
+                          "source": {
+                            "type": "AzureDatabricksDeltaLakeSource",
+                            "query": {
+                              "value": "@activity('Nb get transformed dq table').output.runOutput",
+                              "type": "Expression"
+                            },
+                            "exportSettings": {
+                              "type": "AzureDatabricksDeltaLakeExportCommand"
+                            }
+                          },
+                          "sink": {
+                            "type": "AzureSqlSink",
+                            "preCopyScript": {
+                              "value": "delete from @{activity('Read master config').output.value[0].monitor_sql_details['schema']}.@{activity('Read master config').output.value[0].monitor_sql_details['table_dq_error']} where LOG_PARENT_RUN_ID= '@{pipeline().parameters.log_parent_run_id}'",
+                              "type": "Expression"
+                            },
+                            "writeBehavior": "insert",
+                            "sqlWriterUseTableLock": false,
+                            "disableMetricsCollection": false
+                          },
+                          "enableStaging": true,
+                          "stagingSettings": {
+                            "linkedServiceName": {
+                              "referenceName": "LS_EXP_BLOB_STORAGE_DF",
+                              "type": "LinkedServiceReference"
+                            },
+                            "path": "kcom/temp",
+                            "enableCompression": true
+                          },
+                          "enableSkipIncompatibleRow": false,
+                          "translator": {
+                            "type": "TabularTranslator",
+                            "mappings": [
+                              {
+                                "source": {
+                                  "name": "FILE_NAME",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "FILE_NAME",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "DATA_SOURCE",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "DATA_SOURCE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "DQ_FAILURE_REASON",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "DQ_FAILURE_REASON",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "SEQ_ROW_NUM",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "SEQ_ROW_NUM",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "ERROR_MESSAGE",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ERROR_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "ERROR_ROW_JSON",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ERROR_ROW_JSON",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "LOG_PARENT_RUN_ID",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "LOG_PARENT_RUN_ID",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "LOG_CREATION_DATETIME",
+                                  "type": "DateTime"
+                                },
+                                "sink": {
+                                  "name": "LOG_CREATION_DATETIME",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "CO_RELATION_ID",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "CO_RELATION_ID",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "UNIQUE_KEY",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "UNIQUE_KEY",
+                                  "type": "String"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "inputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "SchemaName": "<schema_name>",
+                              "TableName": "<table_name>",
+                              "adb_url": {
+                                "value": "@pipeline().parameters.adb_url",
+                                "type": "Expression"
+                              },
+                              "adb_cluster_id": {
+                                "value": "@pipeline().parameters.adb_cluster_id",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ],
+                        "outputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_AZURE_SQL_DB",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "table_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['table_dq_error']",
+                                "type": "Expression"
+                              },
+                              "schema_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['schema']",
+                                "type": "Expression"
+                              },
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "kv_secret_conn_str": {
+                                "value": "@activity('Read master config').output.value[0].keyvault_credentials['sql-conn-str']",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "value": "BC",
+                    "activities": [
+                      {
+                        "name": "API_ERROR_LOGGING",
+                        "type": "Copy",
+                        "dependsOn": [
+                          {
+                            "activity": "Filter1",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [
+                          {
+                            "name": "Source",
+                            "value": "@{'<SchemaName>'}.@{'<TableName>'}"
+                          }
+                        ],
+                        "typeProperties": {
+                          "source": {
+                            "type": "AzureDatabricksDeltaLakeSource",
+                            "query": {
+                              "value": "Select *,getdate() as log_creation_date, '@{activity('Filter1').output.value[0].dashboard_name}' as data_source from @{activity('Read master config').output.value[0].delta_table_details['schema']}.@{pipeline().parameters.data_source}@{activity('Read master config').output.value[0].delta_table_details['suffix_centralized_log']}  where stage = '@{item()}' and log_parent_run_id ='@{pipeline().parameters.log_parent_run_id}'",
+                              "type": "Expression"
+                            },
+                            "exportSettings": {
+                              "type": "AzureDatabricksDeltaLakeExportCommand"
+                            }
+                          },
+                          "sink": {
+                            "type": "AzureSqlSink",
+                            "preCopyScript": {
+                              "value": "delete from @{activity('Read master config').output.value[0].monitor_sql_details['schema']}.@{activity('Read master config').output.value[0].monitor_sql_details['table_api_error']} where LOG_PARENT_RUN_ID= '@{pipeline().parameters.log_parent_run_id}'",
+                              "type": "Expression"
+                            },
+                            "writeBehavior": "insert",
+                            "sqlWriterUseTableLock": false,
+                            "disableMetricsCollection": false
+                          },
+                          "enableStaging": true,
+                          "stagingSettings": {
+                            "linkedServiceName": {
+                              "referenceName": "LS_EXP_BLOB_STORAGE_DF",
+                              "type": "LinkedServiceReference"
+                            },
+                            "path": "kcom/temp"
+                          },
+                          "enableSkipIncompatibleRow": false,
+                          "translator": {
+                            "type": "TabularTranslator",
+                            "mappings": [
+                              {
+                                "source": {
+                                  "name": "data_source",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "DATA_SOURCE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "file_name",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "FILE_NAME",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "ada_seq_row_num",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ADA_SEQ_ROW_NUM",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "log_creation_date",
+                                  "type": "DateTime"
+                                },
+                                "sink": {
+                                  "name": "LOG_CREATION_DATETIME",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "log_parent_run_id",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "LOG_PARENT_RUN_ID",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "stage",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "STAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "status",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "STATUS",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "error_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ERROR_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_client_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "BC_CLIENT_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_client_status",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "BC_CLIENT_STATUS",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_engagement_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "BC_ENGAGEMENT_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_engagement_status",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "BC_ENGAGEMENT_STATUS",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "ada_status",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ADA_STATUS",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "ada_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ADA_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "collated_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "COLLATED_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "target_format",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "TARGET_FORMAT",
+                                  "type": "String"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "inputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "SchemaName": {
+                                "value": "@activity('Read master config').output.value[0].delta_table_details['schema']",
+                                "type": "Expression"
+                              },
+                              "TableName": {
+                                "value": "@concat(pipeline().parameters.data_source,activity('Read master config').output.value[0].delta_table_details['suffix_centralized_log'])",
+                                "type": "Expression"
+                              },
+                              "adb_url": {
+                                "value": "@pipeline().parameters.adb_url",
+                                "type": "Expression"
+                              },
+                              "adb_cluster_id": {
+                                "value": "@pipeline().parameters.adb_cluster_id",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ],
+                        "outputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_AZURE_SQL_DB",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "table_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['table_api_error']",
+                                "type": "Expression"
+                              },
+                              "schema_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['schema']",
+                                "type": "Expression"
+                              },
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "kv_secret_conn_str": {
+                                "value": "@activity('Read master config').output.value[0].keyvault_credentials['sql-conn-str']",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "Lookup Data Handling",
+                        "type": "Lookup",
+                        "dependsOn": [],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "source": {
+                            "type": "DelimitedTextSource",
+                            "storeSettings": {
+                              "type": "AzureBlobFSReadSettings",
+                              "recursive": true,
+                              "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                              "type": "DelimitedTextReadSettings"
+                            }
+                          },
+                          "dataset": {
+                            "referenceName": "DS_GEN_ADA_BLOB_CSV",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "FileName": "data_handling_rules.csv",
+                              "FolderName": "config",
+                              "storage_name": {
+                                "value": "@pipeline().globalParameters.storage_account_name",
+                                "type": "Expression"
+                              },
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "ContainerName": {
+                                "value": "@pipeline().globalParameters.container_name",
+                                "type": "Expression"
+                              }
+                            }
+                          },
+                          "firstRowOnly": false
+                        }
+                      },
+                      {
+                        "name": "Filter1",
+                        "type": "Filter",
+                        "dependsOn": [
+                          {
+                            "activity": "Lookup Data Handling",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                          "items": {
+                            "value": "@activity('Lookup Data Handling').output.value",
+                            "type": "Expression"
+                          },
+                          "condition": {
+                            "value": "@equals(item().data_source,pipeline().parameters.data_source)",
+                            "type": "Expression"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "value": "SUMMARY",
+                    "activities": [
+                      {
+                        "name": "Replicate Summary Table",
+                        "type": "Copy",
+                        "dependsOn": [
+                          {
+                            "activity": "Generate Summary",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [
+                          {
+                            "name": "Source",
+                            "value": "@{'<SchemaName>'}.@{'<TableName>'}"
+                          }
+                        ],
+                        "typeProperties": {
+                          "source": {
+                            "type": "AzureDatabricksDeltaLakeSource",
+                            "exportSettings": {
+                              "type": "AzureDatabricksDeltaLakeExportCommand"
+                            }
+                          },
+                          "sink": {
+                            "type": "AzureSqlSink",
+                            "preCopyScript": {
+                              "value": "DELETE FROM @{activity('Read master config').output.value[0].monitor_sql_details['schema']}.@{activity('Read master config').output.value[0].monitor_sql_details['table_summary']} WHERE LOG_PARENT_RUN_ID='@{pipeline().parameters.log_parent_run_id}'",
+                              "type": "Expression"
+                            },
+                            "writeBehavior": "insert",
+                            "sqlWriterUseTableLock": false,
+                            "disableMetricsCollection": false
+                          },
+                          "enableStaging": true,
+                          "stagingSettings": {
+                            "linkedServiceName": {
+                              "referenceName": "LS_EXP_BLOB_STORAGE_DF",
+                              "type": "LinkedServiceReference"
+                            },
+                            "path": "kcom/temp",
+                            "enableCompression": true
+                          },
+                          "enableSkipIncompatibleRow": false,
+                          "translator": {
+                            "type": "TabularTranslator",
+                            "mappings": [
+                              {
+                                "source": {
+                                  "name": "data_source_name",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "DATA_SOURCE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "source_type",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "SOURCE_TYPE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "file_pattern",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "FILE_PATTERN",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "source_file_name",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "SOURCE_FILE_NAME",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "target_file_name",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "TARGET_FILE_NAME",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "file_creationdate",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "FILE_CREATION_DATE",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "is_malware",
+                                  "type": "Boolean"
+                                },
+                                "sink": {
+                                  "name": "IS_MALWARE",
+                                  "type": "Boolean"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "md5_check",
+                                  "type": "Boolean"
+                                },
+                                "sink": {
+                                  "name": "MD5_CHECK",
+                                  "type": "Boolean"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "file_converted",
+                                  "type": "Boolean"
+                                },
+                                "sink": {
+                                  "name": "FILE_CONVERTED",
+                                  "type": "Boolean"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "record_count_bronze",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "RECORD_COUNT_BRONZE",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "dq_error_count",
+                                  "type": "Int64"
+                                },
+                                "sink": {
+                                  "name": "ERROR_COUNT_DQ",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "record_count_gold",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "RECORD_COUNT_GOLD",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_api_success_count",
+                                  "type": "Double"
+                                },
+                                "sink": {
+                                  "name": "SUCCESS_COUNT_BC",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "error_message",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "ERROR_MESSAGE",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_error_count",
+                                  "type": "Int64"
+                                },
+                                "sink": {
+                                  "name": "ERROR_COUNT_BC",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "total_error_count",
+                                  "type": "Int64"
+                                },
+                                "sink": {
+                                  "name": "TOTAL_ERROR_COUNT",
+                                  "type": "Int32"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "dq_error_rate",
+                                  "type": "Double"
+                                },
+                                "sink": {
+                                  "name": "DQ_ERROR_RATE",
+                                  "type": "Decimal"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "bc_api_error_rate",
+                                  "type": "Double"
+                                },
+                                "sink": {
+                                  "name": "API_ERROR_RATE",
+                                  "type": "Decimal"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "overall_status",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "OVERALL_STATUS",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "execution_start_time",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "EXECUTION_START_TIME",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "execution_end_time",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "EXECUTION_END_TIME",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "processed_date",
+                                  "type": "DateTime"
+                                },
+                                "sink": {
+                                  "name": "PROCESSED_DATE",
+                                  "type": "DateTime"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "log_parent_run_id",
+                                  "type": "String"
+                                },
+                                "sink": {
+                                  "name": "LOG_PARENT_RUN_ID",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "success_rate",
+                                  "type": "Double"
+                                },
+                                "sink": {
+                                  "name": "SUCCESS_RATE",
+                                  "type": "Decimal"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "inputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_DELTA_LAKE",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "SchemaName": {
+                                "value": "@activity('Read master config').output.value[0].delta_table_details['schema']",
+                                "type": "Expression"
+                              },
+                              "TableName": {
+                                "value": "@activity('Read master config').output.value[0].delta_table_details['summary_table_name']",
+                                "type": "Expression"
+                              },
+                              "adb_url": {
+                                "value": "@pipeline().parameters.adb_url",
+                                "type": "Expression"
+                              },
+                              "adb_cluster_id": {
+                                "value": "@pipeline().parameters.adb_cluster_id",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ],
+                        "outputs": [
+                          {
+                            "referenceName": "DS_GEN_ADA_AZURE_SQL_DB",
+                            "type": "DatasetReference",
+                            "parameters": {
+                              "table_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['table_summary']",
+                                "type": "Expression"
+                              },
+                              "schema_name": {
+                                "value": "@activity('Read master config').output.value[0].monitor_sql_details['schema']",
+                                "type": "Expression"
+                              },
+                              "kv_name": {
+                                "value": "@pipeline().globalParameters.keyvault_name",
+                                "type": "Expression"
+                              },
+                              "kv_secret_conn_str": {
+                                "value": "@activity('Read master config').output.value[0].keyvault_credentials['sql-conn-str']",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "Generate Summary",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [],
+                        "policy": {
+                          "timeout": "0.12:00:00",
+                          "retry": 0,
+                          "retryIntervalInSeconds": 30,
+                          "secureOutput": false,
+                          "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                          "notebookPath": {
+                            "value": "@concat(pipeline().parameters.adb_repo_url,'ada_workflow/monitoring/generate_summary')",
+                            "type": "Expression"
+                          },
+                          "baseParameters": {
+                            "execution_start_time": {
+                              "value": "@pipeline().parameters.execution_start_time",
+                              "type": "Expression"
+                            },
+                            "data_source": {
+                              "value": "@pipeline().parameters.data_source",
+                              "type": "Expression"
+                            },
+                            "log_parent_run_id": {
+                              "value": "@pipeline().parameters.log_parent_run_id",
+                              "type": "Expression"
+                            },
+                            "container_name": {
+                              "value": "@pipeline().globalParameters.container_name",
+                              "type": "Expression"
+                            },
+                            "execution_end_time": {
+                              "value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'India Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+                              "type": "Expression"
+                            },
+                            "master_config_file": {
+                              "value": "@pipeline().globalParameters.config_master",
+                              "type": "Expression"
+                            },
+                            "storage_account": {
+                              "value": "@pipeline().globalParameters.storage_account_name",
+                              "type": "Expression"
+                            },
+                            "tenant_id": {
+                              "value": "@pipeline().parameters.tenant_id",
+                              "type": "Expression"
+                            }
+                          }
+                        },
+                        "linkedServiceName": {
+                          "referenceName": "LS_ADA_ADB",
+                          "type": "LinkedServiceReference",
+                          "parameters": {
+                            "kv_name": {
+                              "value": "@pipeline().globalParameters.keyvault_name",
+                              "type": "Expression"
+                            },
+                            "adb_url": {
+                              "value": "@pipeline().parameters.adb_url",
+                              "type": "Expression"
+                            },
+                            "adb_cluster_id": {
+                              "value": "@pipeline().parameters.adb_cluster_id",
+                              "type": "Expression"
+                            },
+                            "adb_token_kv": {
+                              "value": "@activity('Read master config').output.value[0].keyvault_credentials['adb_token_kv']",
+                              "type": "Expression"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Lookup1",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "ForEach1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderStoredProcedureName": "[dbo].[SP_POPULATE_TREND]",
+            "storedProcedureParameters": {
+              "ProcessedDate": {
+                "type": "Datetime",
+                "value": "2024-03-12"
+              }
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "dataset": {
+            "referenceName": "DS_GEN_ADA_AZURE_SQL_DB",
+            "type": "DatasetReference",
+            "parameters": {
+              "table_name": "table_name",
+              "schema_name": {
+                "value": "@activity('Read master config').output.value[0].monitor_sql_details['schema']",
+                "type": "Expression"
+              },
+              "kv_name": {
+                "value": "@pipeline().globalParameters.keyvault_name",
+                "type": "Expression"
+              },
+              "kv_secret_conn_str": {
+                "value": "@activity('Read master config').output.value[0].keyvault_credentials['sql-conn-str']",
+                "type": "Expression"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "data_source": {
+        "type": "string",
+        "defaultValue": "time_entry"
+      },
+      "log_parent_run_id": {
+        "type": "string",
+        "defaultValue": "a3573c5f-9f8e-432f-a6a2-47c45e9c71f4"
+      },
+      "stages": {
+        "type": "array",
+        "defaultValue": [
+          "SUMMARY"
+        ]
+      },
+      "adb_url": {
+        "type": "string",
+        "defaultValue": "https://adb-6332549712736765.5.azuredatabricks.net"
+      },
+      "adb_cluster_id": {
+        "type": "string",
+        "defaultValue": "1219-123322-fc3wpci4"
+      },
+      "adb_repo_url": {
+        "type": "string"
+      },
+      "tenant_id": {
+        "type": "string"
+      },
+      "execution_start_time": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "data_source_client_name": {
+        "type": "String"
+      }
+    },
+    "folder": {
+      "name": "ADA/MONITORING"
+    },
+    "annotations": []
+  }
+}
